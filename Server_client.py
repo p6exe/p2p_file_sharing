@@ -19,7 +19,6 @@ HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
 send_buffer = {}
-recv_buffer = {}
 sockets_list = []
 #Dictionary to store multiple addresses
 client_addresses = {}
@@ -87,7 +86,8 @@ def recv(client_socket):
         data = client_socket.recv(1024)
         if data:
             print(f"Received from {client_addresses[client_socket]}: {data.decode('utf-8')}")
-
+        else:
+            close_socket(client_socket)
         #takes in commands from the user:
         #closes
         if(data.decode('utf-8') == "close"):
@@ -118,9 +118,6 @@ def close_server(server_socket):
 def close_socket(client_socket):
     if client_socket in send_buffer:
         del send_buffer[client_socket]
-    if client_socket in recv_buffer:
-        del recv_buffer[client_socket]
-
     
     client_socket.shutdown(socket.SHUT_RDWR)
     client_socket.close()
