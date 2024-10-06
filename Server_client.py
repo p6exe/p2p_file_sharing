@@ -1,26 +1,34 @@
 import socket
-import threading
+import select
 
-#Server configuration
 HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
 #Dictionary to store multiple addresses
 clients = {}
 
-#Create a socket
-def connect_socket():
+#Start the server
+def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     server_socket.bind((HOST, PORT))  # Bind the socket to the host and port
-    server_socket.listen(5)     # Listen for incoming connections 
-
+    server_socket.listen(4)     # Listen for incoming connections 
     print(f"Server started on {HOST}:{PORT}")
-    
-    
+
+    while(True):
+        create_socket(server_socket)
+
+#Create a socket
+def create_socket(server_socket):
+    client_socket = 0
     client_socket, addr = server_socket.accept()  # Accept a new connection
     clients[addr] = client_socket  # Store client in the dictionary
     print(f"Connected by {addr}")
+
     send(client_socket, "hello")
+
+#listens for commands from clients
+def listen_to_socket():
+    pass
 
 #Send a message to a specific client
 def send(client_socket, message):
@@ -48,16 +56,15 @@ def recv(client_socket, addr):
 def close_server(server_socket):
     print("Closing server and all client connections.")
     for addr, client_socket in clients.items():
-        client_socket.close()  # Close each client socket
-    server_socket.close()  # Close the server socket
+        client_socket.close()  #Close each client socket
+    server_socket.close()  #Close the server socket
     print("Server closed.")
 
 def create_distributed_file():
     pass
 
-
 def distribute_file():
     pass
 
 if __name__ == '__main__':
-    connect_socket()
+    start_server()
