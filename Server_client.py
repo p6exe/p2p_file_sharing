@@ -3,7 +3,7 @@ import threading
 
 #Server configuration
 HOST = '127.0.0.1'  # Localhost
-PORT = 80085        # Port to listen on (non-privileged ports are > 1023)
+PORT = 58008        # Port 
 
 #Dictionary to store multiple addresses
 clients = {}
@@ -29,7 +29,35 @@ def send(client_socket, message):
     except Exception as e:
         print(f"Error sending message: {e}")
 
+#Receive messages from the client
+def recv(client_socket, addr):
+    try:
+        while True:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+            print(f"Received from {addr}: {data.decode('utf-8')}")
+            send(client_socket, "Message received!")  # Send acknowledgment
+    except ConnectionResetError:
+        print(f"Client {addr} disconnected")
+    finally:
+        client_socket.close()
+        del clients[addr]
 
-# Start the server when this script is run
+#Close the server and all client connections
+def close_server(server_socket):
+    print("Closing server and all client connections.")
+    for addr, client_socket in clients.items():
+        client_socket.close()  # Close each client socket
+    server_socket.close()  # Close the server socket
+    print("Server closed.")
+
+def create_distributed_file():
+    pass
+
+
+def distribute_file():
+    pass
+
 if __name__ == '__main__':
     connect_socket()
