@@ -51,8 +51,7 @@ def start_server():
                 sockets_list.append(client_socket)
                 
             else: #Receive data
-                if(current_socket in recv_buffer):
-                    recv(current_socket)
+                recv(current_socket)
                 
         #Handle Writable sockets
         for current_socket in writable:
@@ -75,6 +74,10 @@ def send(client_socket, message):
         print(client_socket)
         client_socket.sendall(message.encode('utf-8'))
         print(f"sent to {client_addresses[client_socket]}: {message}")
+
+        if client_socket in send_buffer:
+            del send_buffer[client_socket]
+        
     except ConnectionError as e:
         close_socket(client_socket)
 
@@ -82,15 +85,17 @@ def send(client_socket, message):
 def recv(client_socket):
     try:
         data = client_socket.recv(1024)
-        print(f"Received from {client_addresses[client_socket]}: {data.decode('utf-8')}")
+        if data:
+            print(f"Received from {client_addresses[client_socket]}: {data.decode('utf-8')}")
 
+        #takes in commands from the user:
         #closes
         if(data.decode('utf-8') == "close"):
             close_socket(client_socket)
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
-    except ConnectionResetError:
+    '''except ConnectionResetError:
         print("Connection reset by client")
         close_socket(client_socket)
     except BrokenPipeError:
@@ -98,7 +103,7 @@ def recv(client_socket):
         close_socket(client_socket)
     except OSError as e:
         print(f"OS error: {e}")
-        close_socket(client_socket)
+        close_socket(client_socket)'''
         
 
 #Close the server and all client connections
@@ -111,6 +116,12 @@ def close_server(server_socket):
 
 #handles closing sockets
 def close_socket(client_socket):
+    if client_socket in send_buffer:
+        del send_buffer[client_socket]
+    if client_socket in recv_buffer:
+        del recv_buffer[client_socket]
+
+    
     client_socket.shutdown(socket.SHUT_RDWR)
     client_socket.close()
     print(f"Client {client_addresses[client_socket]} disconnected")

@@ -17,7 +17,7 @@ def connect_to_server():
     while(close_flag == True):
         commands = [recv]
         command = input("command: ").lower()
-        if(command == "recv"):
+        if(command == "recv"): 
             recv(server_socket)
         elif(command == "send"):
             message = input("message: ")
@@ -26,10 +26,8 @@ def connect_to_server():
             close_client(server_socket)
             close_flag = False
         else:
-            print("type help for commands ",commands)
+            print("type help for commands: ",commands)
         
-
-    close_client(server_socket)
 
 #Send a message to the server
 def send(server_socket, message):
