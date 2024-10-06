@@ -3,11 +3,12 @@ import select
 
 '''
 commands the server takes:
-close
 
 tasks:
-establish multiple connects
-communication between server and client
+establish one connection - completed
+establish multiple connects - testing
+client takes in commands
+communication/commands between server and client
 communication between clients
 break up a file
 send file
@@ -17,9 +18,12 @@ integrity checks
 HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
+send_buffer = {}
+recv_buffer = {}
 sockets_list = []
 #Dictionary to store multiple addresses
 client_addresses = {}
+
 
 #Start the server
 def start_server():
@@ -43,14 +47,17 @@ def start_server():
                 
                 #Set the client socket to non-blocking and add to monitoring list
                 client_addresses[client_socket] = client_address
+                client_socket.setblocking(False)                                  #doesn't work
                 sockets_list.append(client_socket)
                 
             else: #Receive data
-                recv(current_socket)
+                if(current_socket in recv_buffer):
+                    recv(current_socket)
                 
         #Handle Writable sockets
         for current_socket in writable:
-            send(current_socket, "hello")
+            if(current_socket in send_buffer):
+                send(current_socket, "hello")
 
 #Create a socket
 def create_socket(server_socket):
@@ -67,6 +74,7 @@ def send(client_socket, message):
     try:
         print(client_socket)
         client_socket.sendall(message.encode('utf-8'))
+        print(f"sent to {client_addresses[client_socket]}: {message}")
     except ConnectionError as e:
         close_socket(client_socket)
 
@@ -81,6 +89,15 @@ def recv(client_socket):
             close_socket(client_socket)
     except ConnectionError as e:
         #Handle client disconnection
+        close_socket(client_socket)
+    except ConnectionResetError:
+        print("Connection reset by client")
+        close_socket(client_socket)
+    except BrokenPipeError:
+        print("Broken pipe: Client disconnected abruptly")
+        close_socket(client_socket)
+    except OSError as e:
+        print(f"OS error: {e}")
         close_socket(client_socket)
         
 
@@ -99,6 +116,7 @@ def close_socket(client_socket):
     print(f"Client {client_addresses[client_socket]} disconnected")
     sockets_list.remove(client_socket)
     del client_addresses[client_socket]
+
 
 def debugger(client_socket):
     print(sockets_list)
