@@ -14,11 +14,10 @@ Server side:
 establish one connection        - completed
 establish multiple connects     - completed
 communication/commands between server and client - adding necessary commands to client and server
-    - receive file 
+    - receive file              - completed
     - break up a file
     - monitor the distribution of chunks
     - send the user the list of peers
-send file
 integrity checks
 
 User side:
@@ -156,8 +155,20 @@ def receive_file(client_socket, file_name):
 
     if received_size == file_size:
         print(f"File {file_name} received successfully")
+
+        split_file_into_chunks(file_name, 4096)
     else:
         print(f"Error: received only {received_size}/{file_size} bytes")
+
+def split_file_into_chunks(file_path, chunk_size):
+    chunks = []
+    with open(file_path, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:  # If no more data, break
+                break
+            chunks.append(chunk)
+    return chunks
 
 #Close the server and all client connections
 def close_server(server_socket):
