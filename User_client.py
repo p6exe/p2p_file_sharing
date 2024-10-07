@@ -28,6 +28,8 @@ def connect_to_server():
         else:
             print("type help for commands: ",commands)
         
+def send_file(server_socket, filename, filelocation):
+    pass
 
 #Send a message to the server
 def send(server_socket, message):
