@@ -59,6 +59,9 @@ def recv(server_socket):
     data = server_socket.recv(1024)
     print(f"Received from server: {data.decode('utf-8')}")
     
+    if(data.decode('utf-8') == "download chunk"):
+        pass
+    elif():
     #send(server_socket, "Message received!")  # Send acknowledgment
 
 #handles closing the client

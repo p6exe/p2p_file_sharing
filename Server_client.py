@@ -14,16 +14,17 @@ Server side:
 establish one connection        - completed
 establish multiple connects     - completed
 communication/commands between server and client - adding necessary commands to client and server
-    - receive file              - completed
-    - break up a file
-    - monitor the distribution of chunks
-    - send the user the list of peers
+receive file                    - completed
+break up a file                 - split implemented
+monitor the distribution of chunks
+send the user the list of peers
 integrity checks
 
 User side:
 establish connection with server            - completed
 get list of peers to download from server   -
 establish connection with multiple peers    -
+parallel downloading                        -
 '''
 
 '''class file:
@@ -34,11 +35,20 @@ establish connection with multiple peers    -
 HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
+default_chunk_size
+class File:
+    def __init__(self, file_name, file_length, chunks = []):
+        self.file_name = file_name
+        self.file_length = file_length
+        self.chunks = chunks
+        self.chunk_orders = {}
+        
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
 file_holders = {}   # stores the files and their respective holders of the chunks e.g. {file : {peers: list of chunks[]}}
 file_length = {}    # {file: file length}
 files = []          # List of files
+DEFAULT_CHUNK_SIZE = 4096
 busy_socket_recv = []
 #Dictionary to store multiple addresses
 client_addresses = {}
@@ -156,7 +166,9 @@ def receive_file(client_socket, file_name):
     if received_size == file_size:
         print(f"File {file_name} received successfully")
 
-        split_file_into_chunks(file_name, 4096)
+        chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+        newfile = File(file_name, file_size, chunks)
+        files.append[newfile]
     else:
         print(f"Error: received only {received_size}/{file_size} bytes")
 
