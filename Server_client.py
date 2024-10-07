@@ -1,5 +1,6 @@
 import socket
 import select
+import os
 
 '''
 commands the server takes:
@@ -39,6 +40,7 @@ sockets_list = []   # List of all sockets (including server socket)
 file_holders = {}   # stores the files and their respective holders of the chunks e.g. {file : {peers: list of chunks[]}}
 file_length = {}    # {file: file length}
 files = []          # List of files
+busy_socket_recv = []
 #Dictionary to store multiple addresses
 client_addresses = {}
 
@@ -65,7 +67,7 @@ def start_server():
                 
                 #Set the client socket to non-blocking and add to monitoring list
                 client_addresses[client_socket] = client_address
-                #client_socket.setblocking(False)                                  #doesn't work
+                client_socket.setblocking(True)                                  #doesn't work
                 sockets_list.append(client_socket)
                 
             else: #Receive data
@@ -109,9 +111,9 @@ def recv(client_socket):
         else:
             close_socket(client_socket)
         #takes in commands from the user:
-        if(data.decode('utf-8') == "Register"):
-            filename = client_socket.recv(1024)
-            receive_file(client_socket, filename)
+        if(data.decode('utf-8') == "register"):
+            #filename = client_socket.recv(1024)
+            receive_file(client_socket, file_name = "new_file.txt")
         #closes
         elif(data.decode('utf-8') == "close"):
             close_socket(client_socket)
@@ -137,12 +139,11 @@ def receive_file(client_socket, file_name):
 
     #Start receiving the file in chunks
     received_size = 0   #total data received
-    buffer_size = 1024  # Read in chunks of 1024 bytes
 
     with open(file_name, 'wb') as file:
         while received_size < file_size:
             remaining_size = file_size - received_size
-            chunk_size = min(buffer_size, remaining_size)
+            chunk_size = min(1024, remaining_size)
             chunk = client_socket.recv(chunk_size)
             
             if not chunk:  #Connection closed before the expected file size
