@@ -37,17 +37,18 @@ PORT = 58008        # Port
 
 default_chunk_size
 class File:
-    def __init__(self, file_name, file_length, chunks = []):
+    def __init__(self, file_name, file_length):
         self.file_name = file_name
         self.file_length = file_length
         self.chunks = chunks
         self.chunk_orders = {}
+        self.holders = {} #{peers: list of chunks[]}
         
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
-file_holders = {}   # stores the files and their respective holders of the chunks e.g. {file : {peers: list of chunks[]}}
-file_length = {}    # {file: file length}
-files = []          # List of files
+#file_holders = {}  # stores the files and their respective holders of the chunks e.g. {file : {peers: list of chunks[]}}
+#file_length = {}   # {file: file length}
+files = {}          # List of files {file name : file object}
 DEFAULT_CHUNK_SIZE = 4096
 busy_socket_recv = []
 #Dictionary to store multiple addresses
@@ -98,6 +99,7 @@ def create_socket(server_socket):
     send(client_socket, "hello")
 '''
 
+
 #Send a message to a specific client
 def send(client_socket, message):
     try:
@@ -110,6 +112,7 @@ def send(client_socket, message):
         
     except ConnectionError as e:
         close_socket(client_socket)
+
 
 #Receive commands from the client
 def recv(client_socket):
@@ -139,6 +142,7 @@ def recv(client_socket):
         print(f"OS error: {e}")
         close_socket(client_socket)'''
     
+
 #receives a file
 def receive_file(client_socket, file_name):
     #Receive the file size from the server
@@ -166,11 +170,31 @@ def receive_file(client_socket, file_name):
     if received_size == file_size:
         print(f"File {file_name} received successfully")
 
-        chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+        #chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         newfile = File(file_name, file_size, chunks)
         files.append[newfile]
     else:
         print(f"Error: received only {received_size}/{file_size} bytes")
+
+
+#send the 
+def send_file(client_socket, filename):
+    with open(file_name, 'rb') as file:
+        file_size = os.path.getsize(file_path)
+        while sent_size < file_size:
+            remaining_size = file_size - sent_size
+            chunk_size = min(1024, remaining_size)
+            chunk = client_socket.send(chunk_size)
+            
+            if not chunk:  #Connection closed before the expected file size
+                break
+
+            file.write(chunk)
+            sent_size += len(chunk)
+
+            print(f"Received {received_size}/{file_size} bytes")
+
+
 
 def split_file_into_chunks(file_path, chunk_size):
     chunks = []
@@ -182,6 +206,7 @@ def split_file_into_chunks(file_path, chunk_size):
             chunks.append(chunk)
     return chunks
 
+
 #Close the server and all client connections
 def close_server(server_socket):
     print("Closing server and all client connections.")
@@ -189,6 +214,7 @@ def close_server(server_socket):
         client_socket.close()  #Close each client socket
     server_socket.close()  #Close the server socket
     print("Server closed.")
+
 
 #handles closing sockets
 def close_socket(client_socket):
@@ -202,15 +228,14 @@ def close_socket(client_socket):
     del client_addresses[client_socket]
 
 
+def distribute_download():
+    pass
+
+
 def debugger(client_socket):
     print(sockets_list)
     print("using ", client_socket)
 
-def create_distributed_file():
-    pass
-
-def distribute_file():
-    pass
 
 if __name__ == '__main__':
     start_server()

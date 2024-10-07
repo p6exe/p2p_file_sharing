@@ -46,7 +46,7 @@ def send_file(server_socket, file_path):
             chunk = file.read(1024)
             if not chunk:  # If no more data, break out of the loop
                 break
-            server_socket.sendall(chunk)  
+            server_socket.sendall(chunk)
 
     print(f"File {file_path} sent successfully!")
 
