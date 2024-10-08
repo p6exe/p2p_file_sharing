@@ -28,10 +28,11 @@ def connect_to_server():
             close_flag = False
         elif(command == "register"):
             file_location = input("File Location: ")
-            send_file(server_socket, 'Test_textfile.txt')
+            send_file(server_socket, 'Testfile.txt')
         else:
             print("type help for commands: ",commands)
         
+#registers a file with the server
 def send_file(server_socket, file_path):
 
     server_socket.sendall("register".encode('utf-8'))

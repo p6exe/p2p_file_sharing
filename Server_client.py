@@ -37,12 +37,13 @@ PORT = 58008        # Port
 
 default_chunk_size
 class File:
-    def __init__(self, file_name, file_length):
+    def __init__(self, file_name, file_length, client_address):
         self.file_name = file_name
         self.file_length = file_length
         self.chunks = chunks
         self.chunk_orders = {}
         self.holders = {} #{peers: list of chunks[]}
+        self.holders[client_address] = file_length//DEFAULT_CHUNK_SIZE + 1 #number of chunks
         
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
@@ -52,7 +53,7 @@ files = {}          # List of files {file name : file object}
 DEFAULT_CHUNK_SIZE = 4096
 busy_socket_recv = []
 #Dictionary to store multiple addresses
-client_addresses = {}
+client_addresses = {} # {socket : addr}
 
 
 #Start the server
@@ -171,13 +172,13 @@ def receive_file(client_socket, file_name):
         print(f"File {file_name} received successfully")
 
         #chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
-        newfile = File(file_name, file_size, chunks)
+        newfile = File(file_name, file_size, client_addresses[client_socket])
         files.append[newfile]
     else:
         print(f"Error: received only {received_size}/{file_size} bytes")
 
 
-#send the 
+#send the file to a user if there are no peers that contain the file
 def send_file(client_socket, filename):
     with open(file_name, 'rb') as file:
         file_size = os.path.getsize(file_path)
