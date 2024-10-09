@@ -1,6 +1,6 @@
 import socket
 import select
-import threading
+import json
 import os
 
 HOST = '127.0.0.1'  #The server's hostname or IP address
@@ -9,11 +9,12 @@ PORT = 58008        #The port used by the server
 file_name = "" #current stores the file name since the file will be stored locally
 
 #established when the user enters the value into the command:
-SELFHOST    #client ip address
-SELFPORT    #client port
+SELFHOST = HOST    #client ip address
+SELFPORT = PORT + 1    #client port
 
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
+
 
 #Connects to the server socket
 def connect_to_server():
@@ -42,6 +43,7 @@ def connect_to_server():
         else:
             print("type help for commands: ",commands)
 
+
 def start_connection():
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, PORT))
@@ -56,6 +58,23 @@ def start_connection():
             if(current_socket in send_buffer):
                 send(current_socket, "hello")
 
+def get_list_of_files(server_socket):
+    data_size = server_socket.recv(4)
+
+    server_socket.sendall("register".encode('utf-8'))
+    data = server_socket.recv(1024)
+    file_list = data.decode('utf-8')
+    while len(data_bytes) < data_size:
+        chunk = server_socket.recv(1024)  # Receive in chunks of 1024 bytes
+        if not chunk:
+            break
+        data_bytes += chunk
+
+    # Decode the received bytes and deserialize the JSON back to a list
+    serialized_data = data_bytes.decode('utf-8')
+    file_list = json.loads(serialized_data)
+    print(f"File {file_list} sent successfully!")
+    return file_list
 
 #registers a file with the server
 '''
@@ -66,7 +85,8 @@ def register(server_socket, file_name):
     file_size = os.path.getsize(file_name)
     server_socket.sendall("register".encode('utf-8'))
     server_socket.sendall(file_name)
-    server_socket.sendall()
+    server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
+    server_socket.sendall(SELFPORT)
 
     print(f"File {file_name} sent successfully!")
 
@@ -90,12 +110,15 @@ def send_file(peer_socket, file_name):
 
     print(f"File {file_name} sent successfully!")
 
+
 def download_from_peers():
     pass
+
 
 #Send a message to the server
 def send(server_socket, message):
     server_socket.sendall(message.encode('utf-8'))  # Send the message encoded
+
 
 #Receive message from server
 def recv(server_socket):
