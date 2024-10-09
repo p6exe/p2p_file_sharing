@@ -35,7 +35,6 @@ parallel downloading                        -
 HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
-default_chunk_size
 class File:
     def __init__(self, file_name, file_length, client_address):
         self.file_name = file_name
@@ -179,9 +178,9 @@ def receive_file(client_socket, file_name):
 
 
 #send the file to a user if there are no peers that contain the file
-def send_file(client_socket, filename):
+def send_file(client_socket, file_name):
     with open(file_name, 'rb') as file:
-        file_size = os.path.getsize(file_path)
+        file_size = os.path.getsize(file_name)
         while sent_size < file_size:
             remaining_size = file_size - sent_size
             chunk_size = min(1024, remaining_size)
