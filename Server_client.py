@@ -39,10 +39,16 @@ class File:
     def __init__(self, file_name, file_length, client_address):
         self.file_name = file_name
         self.file_length = file_length
-        self.chunks = chunks
         self.chunk_orders = {}
         self.holders = {} #{peers: list of chunks[]}
-        self.holders[client_address] = file_length//DEFAULT_CHUNK_SIZE + 1 #number of chunks
+
+        num_of_chunks = 0
+        if (file_length % DEFAULT_CHUNK_SIZE == 0):
+            num_of_chunks = file_length // DEFAULT_CHUNK_SIZE
+        else:
+            num_of_chunks = file_length // DEFAULT_CHUNK_SIZE + 1
+        
+        self.holders[client_address] = num_of_chunks #number of chunks
         
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
@@ -142,7 +148,11 @@ def recv(client_socket):
         print(f"OS error: {e}")
         close_socket(client_socket)'''
     
-
+def register(client_socket):
+    file_name = client_socket.recv(1024) #recvs filename
+    file_size = int.from_bytes(client_socket.recv(1024), byteorder='big') #file size
+    port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
+    client_socket.recv(1024)
 #receives a file
 def receive_file(client_socket, file_name):
     #Receive the file size from the server

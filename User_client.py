@@ -86,7 +86,7 @@ def register(server_socket, file_name):
     server_socket.sendall("register".encode('utf-8'))
     server_socket.sendall(file_name)
     server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
-    server_socket.sendall(SELFPORT)
+    server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
 
     print(f"File {file_name} sent successfully!")
 
