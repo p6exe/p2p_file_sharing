@@ -36,27 +36,28 @@ HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
 class File:
-    def __init__(self, file_name, file_length, client_address):
+    def __init__(self, file_name, file_length, client_port):
         self.file_name = file_name
         self.file_length = file_length
-        self.chunk_orders = {}
-        self.holders = {} #{peers: list of chunks[]}
-
-        num_of_chunks = 0
+        self.chunks = {} #{chunk_num, [client_port }
+        self.num_of_chunks = 0
         if (file_length % DEFAULT_CHUNK_SIZE == 0):
-            num_of_chunks = file_length // DEFAULT_CHUNK_SIZE
+            self.num_of_chunks = file_length // DEFAULT_CHUNK_SIZE
         else:
-            num_of_chunks = file_length // DEFAULT_CHUNK_SIZE + 1
+            self.num_of_chunks = file_length // DEFAULT_CHUNK_SIZE + 1
+
+        for i in range(self.num_of_chunks):
+            self.chunks[i] = [client_port]
         
-        self.holders[client_address] = num_of_chunks #number of chunks
-        
+    def new_chunk():
+        pass
+
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
-#file_holders = {}  # stores the files and their respective holders of the chunks e.g. {file : {peers: list of chunks[]}}
-#file_length = {}   # {file: file length}
 files = {}          # List of files {file name : file object}
 DEFAULT_CHUNK_SIZE = 4096
 busy_socket_recv = []
+
 #Dictionary to store multiple addresses
 client_addresses = {} # {socket : addr}
 
@@ -151,8 +152,14 @@ def recv(client_socket):
 def register(client_socket):
     file_name = client_socket.recv(1024) #recvs filename
     file_size = int.from_bytes(client_socket.recv(1024), byteorder='big') #file size
-    port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
-    client_socket.recv(1024)
+    client_port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
+
+    if file_name in files:
+        newfile = File(file_name, file_size, client_port)
+    else:
+        files[file_name]
+
+
 #receives a file
 def receive_file(client_socket, file_name):
     #Receive the file size from the server

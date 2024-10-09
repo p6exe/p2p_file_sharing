@@ -88,7 +88,9 @@ def register(server_socket, file_name):
     server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
     server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
 
-    print(f"File {file_name} sent successfully!")
+    start_connection() #once registered, user now can be connect from other clients
+
+    print(f"File {file_name} registered with the server!")
 
 
 #send file to peer
@@ -97,6 +99,7 @@ def send_file(peer_socket, file_name):
     peer_socket.sendall("register".encode('utf-8'))
 
     with open(file_name, 'rb') as file:
+
         #Send the size of the file
         file_size = os.path.getsize(file_name)
         peer_socket.sendall(file_size.to_bytes(8, byteorder='big'))
