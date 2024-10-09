@@ -12,6 +12,7 @@ file_name = "" #current stores the file name since the file will be stored local
 SELFHOST = HOST    #client ip address
 SELFPORT = PORT + 1    #client port
 
+
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
 
@@ -37,6 +38,8 @@ def connect_to_server():
         elif(command == "close"):
             close_client(server_socket)
             close_flag = False
+        elif(command == "download"):
+            pass
         elif(command == "register"):
             file_name = input("File name: ")
             register(server_socket, 'Testfile.txt')
@@ -44,19 +47,58 @@ def connect_to_server():
             print("type help for commands: ",commands)
 
 
+#Allow other peers to connect to this user
 def start_connection():
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, PORT))
     self_socket.listen(4)     #Listen for incoming connections
+    sockets_list.append(self_socket)
     self_socket.setblocking(False)
 
-
+    
+    #send the specified chunk
     while True:
         readable, writable, exceptional = select.select(sockets_list, sockets_list, sockets_list)
-
         for current_socket in writable:
             if(current_socket in send_buffer):
                 send(current_socket, "hello")
+
+
+#download from peers
+def download_to_peers(peer_ports):
+
+    sockets_list = []
+
+    for peer in peer_ports:
+        peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        peer_socket.setblocking(False)  # Set to non-blocking
+        try:
+            peer_socket.connect(peer)
+        except BlockingIOError:
+            # Non-blocking connect; do nothing
+            pass
+        sockets_list.append(peer_socket)
+    
+    # Use select to wait for data to be available
+    while (sockets_lists):
+        readable, _, _ = select.select(sockets_list, [], [])
+
+        for peer_socket in readable:
+            try:
+                data = peer_socket.recv(1024)  # Buffer size
+                if data:
+                    print(f"Received data: {data.decode()}")
+                else:
+                    # Peer has closed the connection
+                    print("Peer closed the connection.")
+                    sockets.remove(peer_socket)
+                    peer_socket.close()
+            except Exception as e:
+                print(f"Error receiving data: {e}")
+                sockets_list.remove(peer_socket)
+                peer_socket.close()
+
+
 
 def get_list_of_files(server_socket):
     data_size = server_socket.recv(4)
@@ -64,6 +106,7 @@ def get_list_of_files(server_socket):
     server_socket.sendall("register".encode('utf-8'))
     data = server_socket.recv(1024)
     file_list = data.decode('utf-8')
+
     while len(data_bytes) < data_size:
         chunk = server_socket.recv(1024)  # Receive in chunks of 1024 bytes
         if not chunk:
@@ -71,10 +114,10 @@ def get_list_of_files(server_socket):
         data_bytes += chunk
 
     # Decode the received bytes and deserialize the JSON back to a list
-    serialized_data = data_bytes.decode('utf-8')
-    file_list = json.loads(serialized_data)
-    print(f"File {file_list} sent successfully!")
-    return file_list
+    json_data = data_bytes.decode('utf-8')
+    file_list = json.loads(json_data)
+    print(f"List of files: {file_list}")
+
 
 #registers a file with the server
 '''
@@ -114,8 +157,15 @@ def send_file(peer_socket, file_name):
     print(f"File {file_name} sent successfully!")
 
 
-def download_from_peers():
-    pass
+def split_file_into_chunks(file_path, chunk_size):
+    chunks = []
+    with open(file_path, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:  # If no more data, break
+                break
+            chunks.append(chunk)
+    return chunks
 
 
 #Send a message to the server

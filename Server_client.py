@@ -1,5 +1,6 @@
 import socket
 import select
+import json
 import os
 
 '''
@@ -40,6 +41,7 @@ class File:
         self.file_name = file_name
         self.file_length = file_length
         self.chunks = {} #{chunk_num, [client_port }
+
         self.num_of_chunks = 0
         if (file_length % DEFAULT_CHUNK_SIZE == 0):
             self.num_of_chunks = file_length // DEFAULT_CHUNK_SIZE
@@ -49,8 +51,9 @@ class File:
         for i in range(self.num_of_chunks):
             self.chunks[i] = [client_port]
         
-    def new_chunk():
-        pass
+    def register_new_client(self, client_port):
+        for i in range(self.num_of_chunks):
+            self.chunks[i] = [client_port]
 
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
@@ -149,15 +152,17 @@ def recv(client_socket):
         print(f"OS error: {e}")
         close_socket(client_socket)'''
     
+
 def register(client_socket):
     file_name = client_socket.recv(1024) #recvs filename
     file_size = int.from_bytes(client_socket.recv(1024), byteorder='big') #file size
     client_port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
 
+    #register new file or adds the user as a file holder
     if file_name in files:
         newfile = File(file_name, file_size, client_port)
     else:
-        files[file_name]
+        files[file_name].register_new_client(client_port)
 
 
 #receives a file
@@ -194,34 +199,28 @@ def receive_file(client_socket, file_name):
         print(f"Error: received only {received_size}/{file_size} bytes")
 
 
+def send_list_of_files(client_socket):
+    file_list = files.keys()
+    json_data = json.dumps(file_list)
+    client_socket.sendall(json_data.encode('utf-8'))
+
+
 #send the file to a user if there are no peers that contain the file
-def send_file(client_socket, file_name):
+def send_chunk(client_socket, file_name):
     with open(file_name, 'rb') as file:
         file_size = os.path.getsize(file_name)
         while sent_size < file_size:
             remaining_size = file_size - sent_size
             chunk_size = min(1024, remaining_size)
-            chunk = client_socket.send(chunk_size)
+            chunk = client_socket.sendall(chunk_size)
             
             if not chunk:  #Connection closed before the expected file size
                 break
 
-            file.write(chunk)
             sent_size += len(chunk)
 
             print(f"Received {received_size}/{file_size} bytes")
 
-
-
-def split_file_into_chunks(file_path, chunk_size):
-    chunks = []
-    with open(file_path, 'rb') as file:
-        while True:
-            chunk = file.read(chunk_size)
-            if not chunk:  # If no more data, break
-                break
-            chunks.append(chunk)
-    return chunks
 
 
 #Close the server and all client connections
