@@ -38,7 +38,11 @@ def connect_to_server():
         elif(command == "close"):
             close_client(server_socket)
             close_flag = False
+        elif(command == "file list"):
+            get_list_of_files(server_socket)
         elif(command == "download"):
+            file_name = input("file name: ")
+            download_from_peers(server_socket)
             pass
         elif(command == "register"):
             file_name = input("File name: ")
@@ -48,7 +52,7 @@ def connect_to_server():
 
 
 #Allow other peers to connect to this user
-def start_connection():
+def start_connection(server_socket):
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, PORT))
     self_socket.listen(4)     #Listen for incoming connections
@@ -65,9 +69,11 @@ def start_connection():
 
 
 #download from peers
-def download_to_peers(peer_ports):
+def download_from_peers(server_socket):
 
     sockets_list = []
+    json_data = server_socket.recv(1024)
+    peer_ports
 
     for peer in peer_ports:
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -99,22 +105,25 @@ def download_to_peers(peer_ports):
                 peer_socket.close()
 
 
-
 def get_list_of_files(server_socket):
     data_size = server_socket.recv(4)
 
-    server_socket.sendall("register".encode('utf-8'))
+    server_socket.sendall("get list of files".encode('utf-8'))
     data = server_socket.recv(1024)
-    file_list = data.decode('utf-8')
-
-    while len(data_bytes) < data_size:
+    data_size = data.decode('utf-8')
+    
+    recieved_size = 0
+    while recieved_size < data_size:
         chunk = server_socket.recv(1024)  # Receive in chunks of 1024 bytes
+
         if not chunk:
             break
-        data_bytes += chunk
+
+        received_size += len(chunk)
+        data += chunk
 
     # Decode the received bytes and deserialize the JSON back to a list
-    json_data = data_bytes.decode('utf-8')
+    json_data = data.decode('utf-8')
     file_list = json.loads(json_data)
     print(f"List of files: {file_list}")
 
