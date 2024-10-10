@@ -264,12 +264,13 @@ def receive_file(client_socket, file_name):
 
 
 def send_file_location(client_socket, file_name):
+    num_of_endpoints = len(files[file_name].get_file_locations())
+    out=[f"Number of endpoints: {num_of_endpoints}"]
+    for port in files[file_name].get_file_locations():
+        out.append(f"Chunks at 127.0.0.1:{port}")
+    formattedOut = ';'.join(out)
+    #client_socket.sendall(formattedOut.encode('utf-8'))
 
-    file_list = list(files.keys())
-    num_of_files = len(file_list)
-    out=[f"Number of files: {num_of_files}"]
-    for file in file_list:
-        out.append(f"File Name: {file} Size of file: {files[file].file_length}")
     #check if its in the archived file
     if (file_name in files):
         file_locations = files[file_name].get_file_locations()
@@ -278,9 +279,11 @@ def send_file_location(client_socket, file_name):
         str_list = []
         for num in file_locations:
             str_list.append(str(num))
-
-        data_list = ','.join(str_list)
-        client_socket.sendall(data_list.encode('utf-8'))
+        
+        data_list = ';'.join(str_list)
+        combinedMess = formattedOut + '#' + data_list   
+        client_socket.sendall(combinedMess.encode('utf-8'))
+        print(combinedMess)
         print("Sending location")
     else:               #no files with this name exists
         client_socket.sendall("NULL".encode('utf-8'))

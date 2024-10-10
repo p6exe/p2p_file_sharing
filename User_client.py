@@ -192,21 +192,24 @@ def get_file_location(server_socket, file_name):
 
     #reply from server
     data = server_socket.recv(1024)
-    file_locations = data.decode('utf-8').split(',')
-
-    if (file_locations[0] == "NULL"):
+    parts= data.decode('utf-8').split('#')
+    
+    if (parts[0] == "NULL"):
         print("Not a valid file")
         return
+    formattedOut = parts[0].split(';')
+    print(formattedOut)
 
-    int_list = []
-    for num in file_locations:
-        int_list.append(int(num))
-    
-    if (file_locations[0] != "NULL"):
-        print("File locations: ", int_list)
+    if len(parts) > 1:
+        file_locations = parts[1].split('#')
+        int_list = [int(num) for num in file_locations]
+        #print("Port numbers:", int_list)
         return int_list
-        
-
+    
+    #file_locations =data.decode('utf-8').split(';')
+    #print(file_locations)
+    
+    
 
 
 #registers a file with the server
