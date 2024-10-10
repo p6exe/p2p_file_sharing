@@ -56,6 +56,7 @@ class File:
             self.chunks[i] = [client_port]
 
     #QUESTION: how do you send dictionaries over the network
+    #Question: how to use to_bytes
     def get_file_locations(self):
 
         pass
@@ -220,8 +221,9 @@ def send_file_location(client_socket):
         client_socket.sendall(data)
     else:               #no files with this name exists
         client_socket.sendall("NULL".encode('utf-8'))
-
         
+
+
 def send_list_of_files(client_socket):
     file_list = list(files.keys())
     print(file_list)
