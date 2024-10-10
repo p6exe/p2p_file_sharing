@@ -59,6 +59,7 @@ class File:
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
 files = {}          # List of files {file name : file object}
+files["stinky"] = "poopy"
 DEFAULT_CHUNK_SIZE = 4096
 busy_socket_recv = []
 
@@ -133,13 +134,17 @@ def recv(client_socket):
             print(f"Received from {client_addresses[client_socket]}: {data.decode('utf-8')}")
         else:
             close_socket(client_socket)
+        
+        message = data.decode('utf-8')
         #takes in commands from the user:
-        if(data.decode('utf-8') == "register"):
+        if(message == "register"):
             #filename = client_socket.recv(1024)
             receive_file(client_socket, file_name = "new_file.txt")
         #closes
-        elif(data.decode('utf-8') == "close"):
+        elif(message == "close"):
             close_socket(client_socket)
+        elif(message == "file list"):
+            send_list_of_files(client_socket)
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
@@ -201,9 +206,11 @@ def receive_file(client_socket, file_name):
 
 
 def send_list_of_files(client_socket):
-    file_list = files.keys()
-    json_data = json.dumps(file_list)
-    client_socket.sendall(json_data.encode('utf-8'))
+    file_list = list(files.keys())
+    print(file_list)
+    data_list = ','.join(file_list)
+    data = data_list.encode('utf-8')
+    client_socket.sendall(data)
 
 
 #send the file to a user if there are no peers that contain the file

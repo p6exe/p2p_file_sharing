@@ -1,12 +1,11 @@
 import socket
 import select
-import json
 import os
 
 HOST = '127.0.0.1'  #The server's hostname or IP address
 PORT = 58008        #The port used by the server
 
-file_name = "" #current stores the file name since the file will be stored locally
+file_name = [] #current stores the file name since the file will be stored locally
 
 #established when the user enters the value into the command:
 SELFHOST = HOST    #client ip address
@@ -72,9 +71,9 @@ def start_connection(server_socket):
 def download_from_peers(server_socket):
 
     sockets_list = []
-    json_data = server_socket.recv(1024)
-    peer_ports
-
+    json_data = server_socket.recv(1024).decode('utf-8')
+    peer_ports = json.loads(json_data)
+    
     for peer in peer_ports:
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         peer_socket.setblocking(False)  # Set to non-blocking
@@ -106,25 +105,11 @@ def download_from_peers(server_socket):
 
 
 def get_list_of_files(server_socket):
-    data_size = server_socket.recv(4)
+    server_socket.sendall("file list".encode('utf-8'))
 
-    server_socket.sendall("get list of files".encode('utf-8'))
     data = server_socket.recv(1024)
-    data_size = data.decode('utf-8')
-    
-    recieved_size = 0
-    while recieved_size < data_size:
-        chunk = server_socket.recv(1024)  # Receive in chunks of 1024 bytes
+    file_list = data.decode('utf-8').split(',')
 
-        if not chunk:
-            break
-
-        received_size += len(chunk)
-        data += chunk
-
-    # Decode the received bytes and deserialize the JSON back to a list
-    json_data = data.decode('utf-8')
-    file_list = json.loads(json_data)
     print(f"List of files: {file_list}")
 
 
@@ -143,6 +128,7 @@ def register(server_socket, file_name):
     start_connection() #once registered, user now can be connect from other clients
 
     print(f"File {file_name} registered with the server!")
+
 
 
 #send file to peer
