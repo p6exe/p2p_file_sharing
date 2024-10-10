@@ -1,6 +1,5 @@
 import socket
 import select
-import json
 import os
 
 '''
@@ -12,59 +11,58 @@ should the user be able to communicate with the server while its sending a file?
 tasks:
 
 Server side:
-establish one connection        - completed
-establish multiple connects     - completed
-communication/commands between server and client - adding necessary commands to client and server
-receive file                    - completed
-break up a file                 - split implemented
-monitor the distribution of chunks  - somethin something something
-send the user the list of peers     - completed
+establish one connection                            - completed
+establish multiple connects                         - completed
+communication/commands between server and client    - implementing alongside other commands
+receive file/registers a file                       - completed
+monitor the distribution of chunks                  - something something something
+send the user the list of peers                     - completed
 integrity checks
 
 User side:
 establish connection with server            - completed
 get list of peers to download from server   - completed
 establish connection with multiple peers    -
-parallel downloading                        -
+parallel downloading with multiple peers    -
 '''
 
-'''class file:
-    def __init__(self, filename, addr):
-        self.filename # will also be the object name
-        self.length = '''
 
 HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
 class File:
-    def __init__(self, file_name, file_length, client_port):
+    def __init__(self, file_name, file_size, client_port):
         self.file_name = file_name
-        self.file_length = file_length
+        self.file_size = file_size
         self.chunks = {} #{chunk_num, [client_port]}
 
         self.num_of_chunks = 0
-        if (file_length % DEFAULT_CHUNK_SIZE == 0):
-            self.num_of_chunks = file_length // DEFAULT_CHUNK_SIZE
+        if (file_size % DEFAULT_CHUNK_SIZE == 0):
+            self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE
         else:
-            self.num_of_chunks = file_length // DEFAULT_CHUNK_SIZE + 1
+            self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE + 1
 
         for i in range(self.num_of_chunks):
             self.chunks[i] = [client_port]
-        
+        self.file_debug()
+
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
             self.chunks[i] = [client_port]
 
-    #QUESTION: how do you send dictionaries over the network
-    #Question: how to use to_bytes
     def get_file_locations(self):
         file_locations = []
         for chunk in self.chunks:
             file_locations.append(self.chunks[chunk][0])
         return file_locations
     
+    def remove_user_from_chunk():
+        pass
+
     def file_debug(self):
-        print(" file_name: ", self.file_name, "file_size: ", self.file_size)
+        print("file_name: ", self.file_name, "file_size: ", self.file_size)
+        print("chunks: ", self.chunks)
+
 
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
@@ -157,6 +155,8 @@ def recv(client_socket):
             send_list_of_files(client_socket)
         elif(message == "file location"):
             send_file_location(client_socket)
+        elif(message == "download"):
+            send_download_info(client_socket)
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
@@ -187,6 +187,9 @@ def register(client_socket):
         files[file_name] = newfile
         print("New file: ", file_name)
 
+#sends the user of where to get download from
+def send_download_info(client_socket):
+    pass
 
 #receives a file
 def receive_file(client_socket, file_name):
@@ -234,7 +237,6 @@ def send_file_location(client_socket):
     else:               #no files with this name exists
         client_socket.sendall("NULL".encode('utf-8'))
         
-
 
 def send_list_of_files(client_socket):
     file_list = list(files.keys())

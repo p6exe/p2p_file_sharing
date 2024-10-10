@@ -1,5 +1,6 @@
 import socket
 import select
+import threading
 import os
 
 HOST = '127.0.0.1'  #The server's hostname or IP address
@@ -50,14 +51,13 @@ def connect_to_server():
             file_name = input("File name: ")
             peer_ports = get_file_location(file_name)
             if(peer_ports):
-                download_from_peers(server_socket, peer_ports)
-            else:
-                print("This is not a file name")
+                download_from_peers(server_socket, peer_ports, file_name)
         else:
             print("type help for commands: ",commands)
 
 
-#Allow other peers to connect to this user
+#Allow other peers to connect to this user, 
+# use a thread
 def start_connection():
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, SELFPORT))
@@ -67,49 +67,76 @@ def start_connection():
 
     
     #send the specified chunk
-    '''while True:
+    while True:
         readable, writable, exceptional = select.select(sockets_list, sockets_list, sockets_list)
+        for current_socket in readable:
+            if current_socket == self_socket: #establish new connections
+
+                client_socket, client_address = self_socket.accept()
+                print(f"Connected by {client_address}")
+                
+                #Set the client socket to non-blocking and add to monitoring list
+                client_socket.setblocking(True)                                  #doesn't work
+                sockets_list.append(client_socket)
+
         for current_socket in writable:
             if(current_socket in send_buffer):
-                send(current_socket, "hello")'''
+                send(current_socket, "hello")
 
 
 #download from peers
-def download_from_peers(server_socket, peer_ports):
+def download_from_peers(server_socket, peer_ports, file_name):
+    server_socket.sendall("download".encode('utf-8'))
 
-    sockets_list = []
-    json_data = server_socket.recv(1024).decode('utf-8')
-    peer_ports = json.loads(json_data)
-    
+    peer_sockets_list = []
+    data = server_socket.recv(1024)
+    peer_ports = data.decode('utf-8').split(',')
+    chunk_size = server_socket.recv(1024)
+    num_of_chunks = server_socket.recv(1024)
+    chunks = [None]*num_of_chunks #stores all the chunks downloaded
+
+    #should i use threading?
+    #connect to the peers
     for peer in peer_ports:
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        peer_socket.setblocking(False)  # Set to non-blocking
-        try:
-            peer_socket.connect(peer)
-        except BlockingIOError:
-            # Non-blocking connect; do nothing
-            pass
-        sockets_list.append(peer_socket)
+        peer_socket.connect(peer)
+        peer_sockets_list.append(peer_socket)
     
     # Use select to wait for data to be available
-    while (sockets_list):
-        readable, _, _ = select.select(sockets_list, [], [])
+    while (peer_sockets_list):
+        readable, writable, exceptional = select.select(peer_sockets_list, peer_sockets_list, [])
+
+        #request for a chunk
+        for peer_socket in writable:
+            chunk_num = peer_sockets_list.index(peer_socket)
+            server_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
 
         for peer_socket in readable:
-            try:
-                data = peer_socket.recv(1024)  # Buffer size
-                if data:
-                    print(f"Received data: {data.decode()}")
-                else:
-                    # Peer has closed the connection
-                    print("Peer closed the connection.")
-                    sockets_list.remove(peer_socket)
-                    peer_socket.close()
-            except Exception as e:
-                print(f"Error receiving data: {e}")
-                sockets_list.remove(peer_socket)
+            chunk_num = int.from_bytes(peer_socket.recv(8), byteorder='big')
+            chunks[chunk_num] = peer_socket.recv(chunk_size)
+            peer_sockets_list.remove(peer_socket)
+
+            show_download_progress(chunks)
+
+            if data:
+                print(f"Received data: {data.decode()}")
+                peer_sockets_list.remove(peer_socket)
+                show_download_progress(chunks)
+            else:
+                # Peer has closed the connection
+                print("Peer closed the connection.")
+                peer_sockets_list.remove(peer_socket)
                 peer_socket.close()
 
+    #disconnect from peers
+    for peer in peer_ports:
+        pass
+
+def show_download_progress(chunks):
+    progress = ""
+    for chunk in chunks:
+        if():
+            pass
 
 
 def get_list_of_files(server_socket):
@@ -151,9 +178,11 @@ def register(server_socket, file_name):
 
         server_socket.sendall("register".encode('utf-8'))
         server_socket.sendall(file_name.encode('utf-8'))
+
         confirmation = server_socket.recv(1024)
         if(not confirmation):
             return
+        
         server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
         server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
 
