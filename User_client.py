@@ -9,13 +9,11 @@ PORT = 58008        #The port used by the server
 file_name = [] #current stores the file name since the file will be stored locally
 
 #established when the user enters the value into the command:
-SELFHOST = HOST    #client ip address
-SELFPORT = PORT + 1    #client port
+SELFHOST = HOST         #client ip address
+SELFPORT = PORT + 1     #client port
 
-
-send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
-sockets_list = []   # List of all sockets (including server socket)
-
+files = {}   #{file_name: [chunks]}, file is added when calling register
+DEFAULT_CHUNK_SIZE = 4096
 
 #Connects to the server socket
 def connect_to_server():
@@ -59,29 +57,39 @@ def connect_to_server():
 #Allow other peers to connect to this user, 
 # use a thread
 def start_connection():
+    send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
+    sockets_list = []   # List of all sockets (including server socket)
+
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, SELFPORT))
     self_socket.listen(4)     #Listen for incoming connections
     sockets_list.append(self_socket)
     self_socket.setblocking(False)
-
     
+    chunk_num = -1
+
     #send the specified chunk
     while True:
         readable, writable, exceptional = select.select(sockets_list, sockets_list, sockets_list)
         for current_socket in readable:
             if current_socket == self_socket: #establish new connections
 
-                client_socket, client_address = self_socket.accept()
-                print(f"Connected by {client_address}")
+                peer_socket, peer_address = peer_socket.accept()
+                print(f"Connected by {peer_address}")
                 
                 #Set the client socket to non-blocking and add to monitoring list
-                client_socket.setblocking(True)                                  #doesn't work
-                sockets_list.append(client_socket)
+                peer_socket.setblocking(True)
+                sockets_list.append(peer_socket)
+            else:   #recvs the chunk and filename the user wants to download
+                chunk_num = int.from_bytes(peer_socket.recv(8), byteorder='big')
+                file_name = peer_socket.recv(1024).decode('utf-8')
+                send_buffer.append(current_socket)
+                print("sending file: ", file_name, " chunk: ", chunk_num)
 
+        #send teh chunk to the peer
         for current_socket in writable:
-            if(current_socket in send_buffer):
-                send(current_socket, "hello")
+            if((current_socket in send_buffer) and chunk_num != -1):
+                current_socket.sendall(files[file_name][chunk_num])
 
 
 #download from peers
@@ -89,8 +97,7 @@ def download_from_peers(server_socket, peer_ports, file_name):
     server_socket.sendall("download".encode('utf-8'))
 
     peer_sockets_list = []
-    data = server_socket.recv(1024)
-    peer_ports = data.decode('utf-8').split(',')
+    peer_ports = server_socket.recv(1024).decode('utf-8').split(',')
     chunk_size = server_socket.recv(1024)
     num_of_chunks = server_socket.recv(1024)
     chunks = [None]*num_of_chunks #stores all the chunks downloaded
@@ -109,8 +116,10 @@ def download_from_peers(server_socket, peer_ports, file_name):
         #request for a chunk
         for peer_socket in writable:
             chunk_num = peer_sockets_list.index(peer_socket)
-            server_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
+            peer_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
+            peer_socket.sendall(file_name.encode('utf-8'))
 
+        #gets the download
         for peer_socket in readable:
             chunk_num = int.from_bytes(peer_socket.recv(8), byteorder='big')
             chunks[chunk_num] = peer_socket.recv(chunk_size)
@@ -118,7 +127,7 @@ def download_from_peers(server_socket, peer_ports, file_name):
 
             show_download_progress(chunks)
 
-            if data:
+            '''if data:
                 print(f"Received data: {data.decode()}")
                 peer_sockets_list.remove(peer_socket)
                 show_download_progress(chunks)
@@ -126,7 +135,7 @@ def download_from_peers(server_socket, peer_ports, file_name):
                 # Peer has closed the connection
                 print("Peer closed the connection.")
                 peer_sockets_list.remove(peer_socket)
-                peer_socket.close()
+                peer_socket.close()'''
 
     #disconnect from peers
     for peer in peer_ports:
@@ -186,6 +195,8 @@ def register(server_socket, file_name):
         server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
         server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
 
+        files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+
         start_connection() #once registered, user now can be connect from other clients
 
         print(f"File {file_name} registered with the server!")
@@ -193,6 +204,7 @@ def register(server_socket, file_name):
         print("File doesn't exist")
 
 
+'''
 #send file to peer
 def send_file(peer_socket, file_name):
 
@@ -212,6 +224,7 @@ def send_file(peer_socket, file_name):
             peer_socket.sendall(chunk)
 
     print(f"File {file_name} sent successfully!")
+'''
 
 
 def split_file_into_chunks(file_path, chunk_size):
