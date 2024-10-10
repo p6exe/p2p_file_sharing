@@ -57,6 +57,7 @@ def connect_to_server():
 #Allow other peers to connect to this user, 
 # use a thread
 def start_connection():
+    
     send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
     sockets_list = []   # List of all sockets (including server socket)
 
@@ -65,7 +66,8 @@ def start_connection():
     self_socket.listen(4)     #Listen for incoming connections
     sockets_list.append(self_socket)
     self_socket.setblocking(False)
-    
+    print(f"client starting on {HOST}:{SELFPORT}")
+
     chunk_num = -1
 
     #send the specified chunk
@@ -196,6 +198,7 @@ def register(server_socket, file_name):
         server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
 
         files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+        #print("files: ", files)
 
         start_connection() #once registered, user now can be connect from other clients
 
