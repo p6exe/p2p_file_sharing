@@ -1,6 +1,7 @@
 import socket
 import select
 import os
+import hashlib
 
 '''
 commands the server takes:
@@ -45,6 +46,15 @@ class File:
         for i in range(self.num_of_chunks):
             self.chunks[i] = []
         self.file_debug()
+
+    def compute_chunk_hashes(self):
+        # Open the file and compute the hash for each chunk
+        with open(self.file_name, 'rb') as file:
+            for chunk_num in range(self.num_of_chunks):
+                chunk = file.read(DEFAULT_CHUNK_SIZE)
+                chunk_hash = hashlib.sha256(chunk).hexdigest()  # Compute the hash
+                self.chunk_hashes[chunk_num] = chunk_hash
+                print(f"Chunk {chunk_num} hash: {chunk_hash}")
 
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
@@ -303,22 +313,17 @@ def send_list_of_files(client_socket):
     data = data_list.encode('utf-8')
     client_socket.sendall(data)
 
-
-#send the file to a user if there are no peers that contain the file
-def send_chunk(client_socket, file_name):
-    with open(file_name, 'rb') as file:
-        file_size = os.path.getsize(file_name)
-        while sent_size < file_size:
-            remaining_size = file_size - sent_size
-            chunk_size = min(1024, remaining_size)
-            chunk = client_socket.sendall(chunk_size)
-            
-            if not chunk:  #Connection closed before the expected file size
-                break
-
-            sent_size += len(chunk)
-
-            print(f"Received {file_size}/{file_size} bytes")
+# Send chunk data and hash
+def send_chunk(client_socket, file_name, chunk_num):
+    file = files[file_name]
+    chunk_hash = file.get_chunk_hash(chunk_num)
+    
+    with open(file_name, 'rb') as f:
+        f.seek(chunk_num * DEFAULT_CHUNK_SIZE)
+        chunk = f.read(DEFAULT_CHUNK_SIZE)
+        client_socket.sendall(chunk)  # Send chunk data
+        client_socket.sendall(chunk_hash.encode('utf-8'))  # Send chunk hash
+        print(f"Sent chunk {chunk_num} and hash {chunk_hash} to {client_addresses[client_socket]}")
 
 
 #Close the server and all client connections

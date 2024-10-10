@@ -2,6 +2,7 @@ import socket
 import select
 import threading
 import os
+import hashlib
 
 HOST = '127.0.0.1'  #The server's hostname or IP address
 PORT = 58008        #The port used by the server
@@ -298,6 +299,25 @@ def send_file(peer_socket, file_name):
     print(f"File {file_name} sent successfully!")
 '''
 
+
+# helper func to verify the hash of the downloaded chunk
+def verify_chunk(chunk_data, expected_hash):
+    received_hash = hashlib.sha256(chunk_data).hexdigest()
+    return received_hash == expected_hash
+
+# Downloads a chunk and uses the helper to verify
+def download_and_verify_chunk(peer_socket, file_name, chunk_num):
+    chunk = peer_socket.recv(DEFAULT_CHUNK_SIZE)  # Receive chunk data
+    chunk_hash = peer_socket.recv(64).decode('utf-8')  # Receive chunk hash (SHA-256 hex is 64 chars)
+
+    # Verify the chunk data
+    if verify_chunk(chunk, chunk_hash):
+        print(f"Chunk {chunk_num} matches hash")
+        # Save the chunk
+        with open(file_name, 'ab') as f:
+            f.write(chunk)
+    else:
+        print(f"Chunk {chunk_num} wrong chunk")
 
 def split_file_into_chunks(file_path, chunk_size):
     chunks = []
