@@ -29,6 +29,7 @@ def connect_to_server():
     while(close_flag == True):
         commands = [recv]
         command = input("command: ").lower()
+
         if(command == "recv"): 
             recv(server_socket)
         elif(command == "send"):
@@ -39,38 +40,42 @@ def connect_to_server():
             close_flag = False
         elif(command == "file list"):
             get_list_of_files(server_socket)
-        elif(commnad == "file location"):
+        elif(command == "file location"):
             file_name = input("File name: ")
-
-        elif(command == "download"):
-            file_name = input("file name: ")
-            download_from_peers(server_socket)
+            get_file_location(server_socket, file_name)
         elif(command == "register"):
             file_name = input("File name: ")
-            register(server_socket, 'Testfile.txt')
+            register(server_socket, file_name)
+        elif(command == "download"):
+            file_name = input("File name: ")
+            peer_ports = get_file_location(file_name)
+            if(peer_ports):
+                download_from_peers(server_socket, peer_ports)
+            else:
+                print("This is not a file name")
         else:
             print("type help for commands: ",commands)
 
 
 #Allow other peers to connect to this user
-def start_connection(server_socket):
+def start_connection():
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
-    self_socket.bind((HOST, PORT))
+    self_socket.bind((HOST, SELFPORT))
     self_socket.listen(4)     #Listen for incoming connections
     sockets_list.append(self_socket)
     self_socket.setblocking(False)
 
     
     #send the specified chunk
-    while True:
+    '''while True:
         readable, writable, exceptional = select.select(sockets_list, sockets_list, sockets_list)
         for current_socket in writable:
             if(current_socket in send_buffer):
-                send(current_socket, "hello")
+                send(current_socket, "hello")'''
 
 
 #download from peers
-def download_from_peers(server_socket):
+def download_from_peers(server_socket, peer_ports):
 
     sockets_list = []
     json_data = server_socket.recv(1024).decode('utf-8')
@@ -87,7 +92,7 @@ def download_from_peers(server_socket):
         sockets_list.append(peer_socket)
     
     # Use select to wait for data to be available
-    while (sockets_lists):
+    while (sockets_list):
         readable, _, _ = select.select(sockets_list, [], [])
 
         for peer_socket in readable:
@@ -98,7 +103,7 @@ def download_from_peers(server_socket):
                 else:
                     # Peer has closed the connection
                     print("Peer closed the connection.")
-                    sockets.remove(peer_socket)
+                    sockets_list.remove(peer_socket)
                     peer_socket.close()
             except Exception as e:
                 print(f"Error receiving data: {e}")
@@ -122,10 +127,16 @@ def get_list_of_files(server_socket):
 def get_file_location(server_socket, file_name):
     #request to server 
     server_socket.sendall("file location".encode('utf-8'))
+    server_socket.sendall(file_name.encode('utf-8'))
 
     #reply from server
     data = server_socket.recv(1024)
-    file_location = data.decode('utf-8').split(',')
+    file_locations = data.decode('utf-8').split(',')
+    if (file_locations[0] != "NULL"):
+        print("File locations: ", file_locations)
+        return file_locations
+    else:
+        print("Not a valid file")
 
 
 
@@ -135,16 +146,22 @@ when a file is registered with the server, the server should give the user a por
 client gives the server:
 '''
 def register(server_socket, file_name):
-    file_size = os.path.getsize(file_name)
-    server_socket.sendall("register".encode('utf-8'))
-    server_socket.sendall(file_name)
-    server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
-    server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
+    if os.path.exists(file_name):
+        file_size = os.path.getsize(file_name)
 
-    start_connection() #once registered, user now can be connect from other clients
+        server_socket.sendall("register".encode('utf-8'))
+        server_socket.sendall(file_name.encode('utf-8'))
+        confirmation = server_socket.recv(1024)
+        if(not confirmation):
+            return
+        server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
+        server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
 
-    print(f"File {file_name} registered with the server!")
+        start_connection() #once registered, user now can be connect from other clients
 
+        print(f"File {file_name} registered with the server!")
+    else:
+        print("File doesn't exist")
 
 
 #send file to peer

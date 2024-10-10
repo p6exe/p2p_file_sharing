@@ -58,9 +58,13 @@ class File:
     #QUESTION: how do you send dictionaries over the network
     #Question: how to use to_bytes
     def get_file_locations(self):
-
-        pass
-
+        file_locations = []
+        for chunk in self.chunks:
+            file_locations.append(self.chunks[chunk][0])
+        return file_locations
+    
+    def file_debug(self):
+        print(" file_name: ", self.file_name, "file_size: ", self.file_size)
 
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
@@ -145,12 +149,14 @@ def recv(client_socket):
         #takes in commands from the user:
         if(message == "register"):
             #filename = client_socket.recv(1024)
-            receive_file(client_socket, file_name = "new_file.txt")
+            register(client_socket)
         #closes
         elif(message == "close"):
             close_socket(client_socket)
         elif(message == "file list"):
             send_list_of_files(client_socket)
+        elif(message == "file location"):
+            send_file_location(client_socket)
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
@@ -166,15 +172,20 @@ def recv(client_socket):
     
 
 def register(client_socket):
-    file_name = client_socket.recv(1024) #recvs filename
-    file_size = int.from_bytes(client_socket.recv(1024), byteorder='big') #file size
+    print("upper debug")
+    file_name = (client_socket.recv(1024)).decode('utf-8')                  #recvs filename
+    print(file_name)
+    send_confirmation(client_socket)
+    file_size = int.from_bytes(client_socket.recv(1024), byteorder='big')   #file size
     client_port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
 
     #register new file or adds the user as a file holder
     if file_name in files:
-        newfile = File(file_name, file_size, client_port)
-    else:
         files[file_name].register_new_client(client_port)
+    else:
+        newfile = File(file_name, file_size, client_port)
+        files[file_name] = newfile
+        print("New file: ", file_name)
 
 
 #receives a file
@@ -206,7 +217,7 @@ def receive_file(client_socket, file_name):
 
         #chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         newfile = File(file_name, file_size, client_addresses[client_socket])
-        files.append[newfile]
+        files[file_name] = newfile
     else:
         print(f"Error: received only {received_size}/{file_size} bytes")
 
@@ -217,8 +228,9 @@ def send_file_location(client_socket):
 
     #check if its in the archived file
     if (file_name in files):
-        file_location = files[file_name].get_file_location()
-        client_socket.sendall(data)
+        file_locations = files[file_name].get_file_location()
+        data_list = ','.join(file_locations)
+        client_socket.sendall(data_list.encode('utf-8'))
     else:               #no files with this name exists
         client_socket.sendall("NULL".encode('utf-8'))
         
@@ -226,7 +238,6 @@ def send_file_location(client_socket):
 
 def send_list_of_files(client_socket):
     file_list = list(files.keys())
-    print(file_list)
     data_list = ','.join(file_list)
     data = data_list.encode('utf-8')
     client_socket.sendall(data)
@@ -246,7 +257,7 @@ def send_chunk(client_socket, file_name):
 
             sent_size += len(chunk)
 
-            print(f"Received {received_size}/{file_size} bytes")
+            print(f"Received {file_size}/{file_size} bytes")
 
 
 #Close the server and all client connections
@@ -270,8 +281,8 @@ def close_socket(client_socket):
     del client_addresses[client_socket]
 
 
-def distribute_download():
-    pass
+def send_confirmation(client_socket):
+    client_socket.sendall("confirm".encode('utf-8'))
 
 
 def debugger(client_socket):
