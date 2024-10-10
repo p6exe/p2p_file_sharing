@@ -6,6 +6,7 @@ import os
 commands the server takes:
 
 Assume both the server and user have the same Host address but different Ports
+Each user enters their own port whent ehy register with the server
 
 tasks:
 
@@ -47,8 +48,8 @@ class File:
 
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
-            self.chunks[i] = [client_port]
-            #self.chunks[i].append(client_port)
+            #self.chunks[i] = [client_port]
+            self.chunks[i].append(client_port)
         self.file_debug()
 
     def get_file_locations(self):
@@ -60,8 +61,12 @@ class File:
     def get_num_of_chunks(self):
         return self.num_of_chunks
 
-    def remove_user_from_chunk(self):
-        pass
+    def remove_user_from_chunk(self, userport):
+        for chunk in self.chunks:
+            if(userport in self.chunks[chunk]):
+                self.chunks[chunk].remove(userport)
+        print("removing port addres: ", userport)
+        self.file_debug()
 
     def file_debug(self):
         print("file_name: ", self.file_name, "file_size: ", self.file_size)
@@ -71,12 +76,12 @@ class File:
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
 sockets_list = []   # List of all sockets (including server socket)
 files = {}          # List of files {file name : file object}
-files["stinky"] = "poopy"
 DEFAULT_CHUNK_SIZE = 4096
 busy_socket_recv = []
 
 #Dictionary to store multiple addresses
 client_addresses = {} # {socket : addr}
+client_ports = {} #{socket : port}
 
 
 #Start the server
@@ -183,6 +188,7 @@ def register(client_socket):
     file_size = int.from_bytes(client_socket.recv(1024), byteorder='big')   #file size
     client_port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
 
+    client_ports[client_socket] = client_port
     #register new file or adds the user as a file holder
     if file_name in files:
         files[file_name].register_new_client(client_port)
@@ -288,7 +294,12 @@ def close_server(server_socket):
 def close_socket(client_socket):
     if client_socket in send_buffer:
         del send_buffer[client_socket]
-    
+
+    #remove the address from all files
+    if client_socket in client_ports:
+        for file_name in files:
+            files[file_name].remove_user_from_chunk(client_ports[client_socket])
+
     client_socket.shutdown(socket.SHUT_RDWR)
     client_socket.close()
     print(f"Client {client_addresses[client_socket]} disconnected")

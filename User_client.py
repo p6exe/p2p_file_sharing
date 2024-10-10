@@ -10,7 +10,6 @@ file_name = [] #current stores the file name since the file will be stored local
 
 #established when the user enters the value into the command:
 SELFHOST = HOST         #client ip address
-SELFPORT = PORT + 1     #client port
 
 files = {}   #{file_name: {chunks}}, file is added when calling register
 DEFAULT_CHUNK_SIZE = 4096
@@ -57,16 +56,16 @@ def connect_to_server():
 
 #Allow other peers to connect to this user, 
 # use a thread
-def start_connection():
+def start_connection(Selfport):
     
     sockets_list = []   # List of all sockets (including server socket)
     socket_addr = {} 
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
-    self_socket.bind((HOST, SELFPORT))
+    self_socket.bind((HOST, Selfport))
     self_socket.listen(4)     #Listen for incoming connections
     sockets_list.append(self_socket)
     self_socket.setblocking(False)
-    print(f"client starting on {HOST}:{SELFPORT}")
+    print(f"client starting on {HOST}:{Selfport}")
 
 
     #send the specified chunk
@@ -154,8 +153,6 @@ def download_from_peers(server_socket, peer_ports, file_name):
             peer_sockets_list.remove(peer_socket)
             peer_socket.close()
             
-            
-
             '''if data:
                 print(f"Received data: {data.decode()}")
                 peer_sockets_list.remove(peer_socket)
@@ -165,9 +162,9 @@ def download_from_peers(server_socket, peer_ports, file_name):
                 print("Peer closed the connection.")
                 peer_sockets_list.remove(peer_socket)
                 peer_socket.close()'''
-
+    register(server_socket, file_name)
     #writes a new file
-    with open("newfile", 'wb') as file:
+    with open("newfile.txt", 'wb') as file:
         for chunk in chunks:
             file.write(chunk)
 
@@ -217,6 +214,7 @@ client gives the server:
 def register(server_socket, file_name):
     if os.path.exists(file_name):
         file_size = os.path.getsize(file_name)
+        Selfport = int(input("User port (0 - 65535): " ))
 
         server_socket.sendall("register".encode('utf-8'))
         server_socket.sendall(file_name.encode('utf-8'))
@@ -226,12 +224,12 @@ def register(server_socket, file_name):
             return
         
         server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
-        server_socket.sendall(SELFPORT.to_bytes(8, byteorder='big'))
+        server_socket.sendall(Selfport.to_bytes(8, byteorder='big'))
 
         files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         #print("files: ", files)
 
-        start_connection() #once registered, user now can be connect from other clients
+        start_connection(Selfport) #once registered, user now can be connect from other clients
 
         print(f"File {file_name} registered with the server!")
     else:
@@ -270,39 +268,6 @@ def split_file_into_chunks(file_path, chunk_size):
                 break
             chunks.append(chunk)
     return chunks
-
-#write the file
-def receive_file(client_socket, file_name):
-    #Receive the file size from the server
-    file_size_data = client_socket.recv(8)  #Expecting 8 bytes for file size
-    file_size = int.from_bytes(file_size_data, byteorder='big')
-    print(f"Receiving file of size: {file_size} bytes")
-
-    #Start receiving the file in chunks
-    received_size = 0   #total data received
-
-    with open(file_name, 'wb') as file:
-        while received_size < file_size:
-            remaining_size = file_size - received_size
-            chunk_size = min(1024, remaining_size)
-            chunk = client_socket.recv(chunk_size)
-            
-            if not chunk:  #Connection closed before the expected file size
-                break
-
-            file.write(chunk)
-            received_size += len(chunk)
-
-            print(f"Received {received_size}/{file_size} bytes")
-
-    if received_size == file_size:
-        print(f"File {file_name} received successfully")
-
-        #chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
-        newfile = File(file_name, file_size, client_addresses[client_socket])
-        files[file_name] = newfile
-    else:
-        print(f"Error: received only {received_size}/{file_size} bytes")
 
 #Send a message to the server
 def send(server_socket, message):
