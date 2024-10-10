@@ -12,7 +12,7 @@ file_name = [] #current stores the file name since the file will be stored local
 SELFHOST = HOST         #client ip address
 SELFPORT = PORT + 1     #client port
 
-files = {}   #{file_name: [chunks]}, file is added when calling register
+files = {}   #{file_name: {chunks}}, file is added when calling register
 DEFAULT_CHUNK_SIZE = 4096
 
 #Connects to the server socket
@@ -47,8 +47,9 @@ def connect_to_server():
             register(server_socket, file_name)
         elif(command == "download"):
             file_name = input("File name: ")
-            peer_ports = get_file_location(file_name)
+            peer_ports = get_file_location(server_socket, file_name)
             if(peer_ports):
+                print("stinky")
                 download_from_peers(server_socket, peer_ports, file_name)
         else:
             print("type help for commands: ",commands)
@@ -58,9 +59,9 @@ def connect_to_server():
 # use a thread
 def start_connection():
     
-    send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
+    send_buffer = []    # Buffers that stores the sockets that need a reply after they request
     sockets_list = []   # List of all sockets (including server socket)
-
+    
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, SELFPORT))
     self_socket.listen(4)     #Listen for incoming connections
@@ -76,7 +77,7 @@ def start_connection():
         for current_socket in readable:
             if current_socket == self_socket: #establish new connections
 
-                peer_socket, peer_address = peer_socket.accept()
+                peer_socket, peer_address = self_socket.accept()
                 print(f"Connected by {peer_address}")
                 
                 #Set the client socket to non-blocking and add to monitoring list
@@ -91,35 +92,43 @@ def start_connection():
         #send teh chunk to the peer
         for current_socket in writable:
             if((current_socket in send_buffer) and chunk_num != -1):
+                print(files[file_name][chunk_num])
                 current_socket.sendall(files[file_name][chunk_num])
 
 
 #download from peers
 def download_from_peers(server_socket, peer_ports, file_name):
     server_socket.sendall("download".encode('utf-8'))
+    server_socket.sendall(file_name.encode('utf-8'))
 
+    send_buffer = []
     peer_sockets_list = []
-    peer_ports = server_socket.recv(1024).decode('utf-8').split(',')
-    chunk_size = server_socket.recv(1024)
-    num_of_chunks = server_socket.recv(1024)
+    print("waiting")
+    chunk_size = int.from_bytes(server_socket.recv(8), byteorder='big')
+    print(chunk_size)
+    num_of_chunks = int.from_bytes(server_socket.recv(8), byteorder='big')
     chunks = [None]*num_of_chunks #stores all the chunks downloaded
 
-    #should i use threading?
+    print(chunk_size, num_of_chunks)
+    
+    
     #connect to the peers
     for peer in peer_ports:
-        peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        peer_socket.connect(peer)
-        peer_sockets_list.append(peer_socket)
+        #establishes connection with peers
+        if(peer not in peer_sockets_list):
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.connect((HOST,peer))
+            peer_sockets_list.append(peer_socket)
+
+        #sends a request from to that peer
+        chunk_num = peer_sockets_list.index(peer_socket)
+        peer_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
+        peer_socket.sendall(file_name.encode('utf-8'))
+        print("connected to ", peer)
     
     # Use select to wait for data to be available
     while (peer_sockets_list):
         readable, writable, exceptional = select.select(peer_sockets_list, peer_sockets_list, [])
-
-        #request for a chunk
-        for peer_socket in writable:
-            chunk_num = peer_sockets_list.index(peer_socket)
-            peer_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
-            peer_socket.sendall(file_name.encode('utf-8'))
 
         #gets the download
         for peer_socket in readable:
@@ -170,11 +179,19 @@ def get_file_location(server_socket, file_name):
     #reply from server
     data = server_socket.recv(1024)
     file_locations = data.decode('utf-8').split(',')
-    if (file_locations[0] != "NULL"):
-        print("File locations: ", file_locations)
-        return file_locations
-    else:
+
+    if (file_locations[0] == "NULL"):
         print("Not a valid file")
+        return
+
+    int_list = []
+    for num in file_locations:
+        int_list.append(int(num))
+    
+    if (file_locations[0] != "NULL"):
+        print("File locations: ", int_list)
+        return int_list
+        
 
 
 
@@ -240,6 +257,38 @@ def split_file_into_chunks(file_path, chunk_size):
             chunks.append(chunk)
     return chunks
 
+#write the file
+def receive_file(client_socket, file_name):
+    #Receive the file size from the server
+    file_size_data = client_socket.recv(8)  #Expecting 8 bytes for file size
+    file_size = int.from_bytes(file_size_data, byteorder='big')
+    print(f"Receiving file of size: {file_size} bytes")
+
+    #Start receiving the file in chunks
+    received_size = 0   #total data received
+
+    with open(file_name, 'wb') as file:
+        while received_size < file_size:
+            remaining_size = file_size - received_size
+            chunk_size = min(1024, remaining_size)
+            chunk = client_socket.recv(chunk_size)
+            
+            if not chunk:  #Connection closed before the expected file size
+                break
+
+            file.write(chunk)
+            received_size += len(chunk)
+
+            print(f"Received {received_size}/{file_size} bytes")
+
+    if received_size == file_size:
+        print(f"File {file_name} received successfully")
+
+        #chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+        newfile = File(file_name, file_size, client_addresses[client_socket])
+        files[file_name] = newfile
+    else:
+        print(f"Error: received only {received_size}/{file_size} bytes")
 
 #Send a message to the server
 def send(server_socket, message):

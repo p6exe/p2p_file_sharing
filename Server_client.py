@@ -5,8 +5,7 @@ import os
 '''
 commands the server takes:
 
-Questions:
-should the user be able to communicate with the server while its sending a file?
+Assume both the server and user have the same Host address but different Ports
 
 tasks:
 
@@ -49,6 +48,8 @@ class File:
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
             self.chunks[i] = [client_port]
+            #self.chunks[i].append(client_port)
+        self.file_debug()
 
     def get_file_locations(self):
         file_locations = []
@@ -56,7 +57,10 @@ class File:
             file_locations.append(self.chunks[chunk][0])
         return file_locations
     
-    def remove_user_from_chunk():
+    def get_num_of_chunks(self):
+        return self.num_of_chunks
+
+    def remove_user_from_chunk(self):
         pass
 
     def file_debug(self):
@@ -154,9 +158,11 @@ def recv(client_socket):
         elif(message == "file list"):
             send_list_of_files(client_socket)
         elif(message == "file location"):
-            send_file_location(client_socket)
+            file_name = client_socket.recv(1024).decode('utf-8')
+            send_file_location(client_socket, file_name)
         elif(message == "download"):
-            send_download_info(client_socket)
+            file_name = client_socket.recv(1024).decode('utf-8')
+            send_download_info(client_socket, file_name)
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
@@ -172,9 +178,7 @@ def recv(client_socket):
     
 
 def register(client_socket):
-    print("upper debug")
     file_name = (client_socket.recv(1024)).decode('utf-8')                  #recvs filename
-    print(file_name)
     send_confirmation(client_socket)
     file_size = int.from_bytes(client_socket.recv(1024), byteorder='big')   #file size
     client_port = int.from_bytes(client_socket.recv(1024), byteorder='big') #the port of the client
@@ -187,9 +191,12 @@ def register(client_socket):
         files[file_name] = newfile
         print("New file: ", file_name)
 
-#sends the user of where to get download from
-def send_download_info(client_socket):
-    pass
+#sends the user the info of where to get download from
+def send_download_info(client_socket, file_name):
+    client_socket.sendall(DEFAULT_CHUNK_SIZE.to_bytes(8, byteorder='big'))
+    num_of_chunks = files[file_name].get_num_of_chunks()
+    client_socket.sendall(num_of_chunks.to_bytes(8, byteorder='big'))
+    print(f"download info sent to {client_addresses[client_socket]}")
 
 #receives a file
 def receive_file(client_socket, file_name):
@@ -225,17 +232,23 @@ def receive_file(client_socket, file_name):
         print(f"Error: received only {received_size}/{file_size} bytes")
 
 
-def send_file_location(client_socket):
-    #get file name
-    file_name = client_socket.recv(1024).decode('utf-8')
+def send_file_location(client_socket, file_name):
 
     #check if its in the archived file
     if (file_name in files):
-        file_locations = files[file_name].get_file_location()
-        data_list = ','.join(file_locations)
+        file_locations = files[file_name].get_file_locations()
+
+        #converts the integers to strings
+        str_list = []
+        for num in file_locations:
+            str_list.append(str(num))
+
+        data_list = ','.join(str_list)
         client_socket.sendall(data_list.encode('utf-8'))
+        print("Sending location")
     else:               #no files with this name exists
         client_socket.sendall("NULL".encode('utf-8'))
+        print("Not a valid file name")
         
 
 def send_list_of_files(client_socket):
