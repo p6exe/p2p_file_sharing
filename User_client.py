@@ -39,10 +39,12 @@ def connect_to_server():
             close_flag = False
         elif(command == "file list"):
             get_list_of_files(server_socket)
+        elif(commnad == "file location"):
+            file_name = input("File name: ")
+
         elif(command == "download"):
             file_name = input("file name: ")
             download_from_peers(server_socket)
-            pass
         elif(command == "register"):
             file_name = input("File name: ")
             register(server_socket, 'Testfile.txt')
@@ -104,13 +106,27 @@ def download_from_peers(server_socket):
                 peer_socket.close()
 
 
-def get_list_of_files(server_socket):
-    server_socket.sendall("file list".encode('utf-8'))
 
+def get_list_of_files(server_socket):
+    #request to server
+    server_socket.sendall("file list".encode('utf-8')) 
+
+    #reply from server
     data = server_socket.recv(1024)
     file_list = data.decode('utf-8').split(',')
 
     print(f"List of files: {file_list}")
+
+
+
+def get_file_location(server_socket, file_name):
+    #request to server 
+    server_socket.sendall("file location".encode('utf-8'))
+
+    #reply from server
+    data = server_socket.recv(1024)
+    file_location = data.decode('utf-8').split(',')
+
 
 
 #registers a file with the server

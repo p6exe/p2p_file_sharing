@@ -17,13 +17,13 @@ establish multiple connects     - completed
 communication/commands between server and client - adding necessary commands to client and server
 receive file                    - completed
 break up a file                 - split implemented
-monitor the distribution of chunks
-send the user the list of peers
+monitor the distribution of chunks  - somethin something something
+send the user the list of peers     - completed
 integrity checks
 
 User side:
 establish connection with server            - completed
-get list of peers to download from server   -
+get list of peers to download from server   - completed
 establish connection with multiple peers    -
 parallel downloading                        -
 '''
@@ -40,7 +40,7 @@ class File:
     def __init__(self, file_name, file_length, client_port):
         self.file_name = file_name
         self.file_length = file_length
-        self.chunks = {} #{chunk_num, [client_port }
+        self.chunks = {} #{chunk_num, [client_port]}
 
         self.num_of_chunks = 0
         if (file_length % DEFAULT_CHUNK_SIZE == 0):
@@ -54,6 +54,11 @@ class File:
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
             self.chunks[i] = [client_port]
+
+    #QUESTION: how do you send dictionaries over the network
+    def get_file_locations(self):
+
+        pass
 
 
 send_buffer = {}    # Buffers that stores the sockets that need a reply after they request
@@ -205,6 +210,18 @@ def receive_file(client_socket, file_name):
         print(f"Error: received only {received_size}/{file_size} bytes")
 
 
+def send_file_location(client_socket):
+    #get file name
+    file_name = client_socket.recv(1024).decode('utf-8')
+
+    #check if its in the archived file
+    if (file_name in files):
+        file_location = files[file_name].get_file_location()
+        client_socket.sendall(data)
+    else:               #no files with this name exists
+        client_socket.sendall("NULL".encode('utf-8'))
+
+        
 def send_list_of_files(client_socket):
     file_list = list(files.keys())
     print(file_list)
@@ -228,7 +245,6 @@ def send_chunk(client_socket, file_name):
             sent_size += len(chunk)
 
             print(f"Received {received_size}/{file_size} bytes")
-
 
 
 #Close the server and all client connections
