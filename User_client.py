@@ -59,9 +59,8 @@ def connect_to_server():
 # use a thread
 def start_connection():
     
-    send_buffer = []    # Buffers that stores the sockets that need a reply after they request
     sockets_list = []   # List of all sockets (including server socket)
-    
+    socket_addr = {} 
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, SELFPORT))
     self_socket.listen(4)     #Listen for incoming connections
@@ -69,7 +68,6 @@ def start_connection():
     self_socket.setblocking(False)
     print(f"client starting on {HOST}:{SELFPORT}")
 
-    chunk_num = -1
 
     #send the specified chunk
     while True:
@@ -79,21 +77,34 @@ def start_connection():
 
                 peer_socket, peer_address = self_socket.accept()
                 print(f"Connected by {peer_address}")
-                
+                socket_addr[peer_socket] = peer_address
+
                 #Set the client socket to non-blocking and add to monitoring list
                 peer_socket.setblocking(True)
                 sockets_list.append(peer_socket)
-            else:   #recvs the chunk and filename the user wants to download
-                chunk_num = int.from_bytes(peer_socket.recv(8), byteorder='big')
-                file_name = peer_socket.recv(1024).decode('utf-8')
-                send_buffer.append(current_socket)
-                print("sending file: ", file_name, " chunk: ", chunk_num)
 
-        #send teh chunk to the peer
-        for current_socket in writable:
-            if((current_socket in send_buffer) and chunk_num != -1):
-                print(files[file_name][chunk_num])
+            else:   #recvs the chunk and filename the user wants to download
+                chunk_num = int.from_bytes(current_socket.recv(8), byteorder='big')
+                file_name = current_socket.recv(1024).decode('utf-8')
+
+                current_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
                 current_socket.sendall(files[file_name][chunk_num])
+                sockets_list.remove(current_socket)
+
+                print("Request file: ", file_name, " chunk: ", chunk_num, " from: ", socket_addr[current_socket])
+
+        #doesnt work
+        '''#send teh chunk to the peer
+        for current_socket in writable:
+            if(current_socket in send_buffer):
+                chunk_num = send_buffer[current_socket][0]
+                print("sending chunk num ",chunk_num, "of file", file_name)
+                current_socket.sendall(files[file_name][chunk_num])
+                send_buffer.remove(current_socket)
+
+                #del socket from buffer once all chunks are sent
+                if(not send_buffer[current_socket]):
+                    del send_buffer[current_socket]'''
 
 
 #download from peers
@@ -101,11 +112,9 @@ def download_from_peers(server_socket, peer_ports, file_name):
     server_socket.sendall("download".encode('utf-8'))
     server_socket.sendall(file_name.encode('utf-8'))
 
-    send_buffer = []
+    recv_buffer = {} #{chunk num: peer socket}
     peer_sockets_list = []
-    print("waiting")
     chunk_size = int.from_bytes(server_socket.recv(8), byteorder='big')
-    print(chunk_size)
     num_of_chunks = int.from_bytes(server_socket.recv(8), byteorder='big')
     chunks = [None]*num_of_chunks #stores all the chunks downloaded
 
@@ -114,29 +123,38 @@ def download_from_peers(server_socket, peer_ports, file_name):
     
     #connect to the peers
     for peer in peer_ports:
-        #establishes connection with peers
-        if(peer not in peer_sockets_list):
-            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            peer_socket.connect((HOST,peer))
-            peer_sockets_list.append(peer_socket)
 
-        #sends a request from to that peer
+        #establishes connection with peers
+        peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        peer_socket.connect((HOST,peer))
+        peer_sockets_list.append(peer_socket)
+            
+
+        #sends a request to that peer
         chunk_num = peer_sockets_list.index(peer_socket)
+
         peer_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
         peer_socket.sendall(file_name.encode('utf-8'))
-        print("connected to ", peer)
+        recv_buffer[chunk_num] = peer_socket
+
+        print("sent chunk: ", chunk_num, " request to ", peer)
     
-    # Use select to wait for data to be available
-    while (peer_sockets_list):
-        readable, writable, exceptional = select.select(peer_sockets_list, peer_sockets_list, [])
+    # Use select to wait for data to be available download in concurrently
+    while (recv_buffer):
+        readable, writable, exceptional = select.select(peer_sockets_list, [], [])
 
         #gets the download
         for peer_socket in readable:
+            
             chunk_num = int.from_bytes(peer_socket.recv(8), byteorder='big')
+            print("recieved chunk: ", chunk_num)
             chunks[chunk_num] = peer_socket.recv(chunk_size)
-            peer_sockets_list.remove(peer_socket)
+            recv_buffer.pop(chunk_num)
 
-            show_download_progress(chunks)
+            peer_sockets_list.remove(peer_socket)
+            peer_socket.close()
+            
+            
 
             '''if data:
                 print(f"Received data: {data.decode()}")
@@ -148,15 +166,11 @@ def download_from_peers(server_socket, peer_ports, file_name):
                 peer_sockets_list.remove(peer_socket)
                 peer_socket.close()'''
 
-    #disconnect from peers
-    for peer in peer_ports:
-        pass
+    #writes a new file
+    with open("newfile", 'wb') as file:
+        for chunk in chunks:
+            file.write(chunk)
 
-def show_download_progress(chunks):
-    progress = ""
-    for chunk in chunks:
-        if():
-            pass
 
 
 def get_list_of_files(server_socket):
@@ -293,6 +307,10 @@ def receive_file(client_socket, file_name):
 #Send a message to the server
 def send(server_socket, message):
     server_socket.sendall(message.encode('utf-8'))  # Send the message encoded
+
+
+def send_confirmation(client_socket):
+    client_socket.sendall("confirm".encode('utf-8'))
 
 
 #Receive message from server
