@@ -259,7 +259,14 @@ def send_file_location(client_socket, file_name):
 
 def send_list_of_files(client_socket):
     file_list = list(files.keys())
-    data_list = ','.join(file_list)
+    num_of_files = len(file_list)
+
+    out=[f"Number of files: {num_of_files}"]
+    
+    for file in file_list:
+        out.append(f"File Name: {file} Size of file: {files[file].file_size}")
+    
+    data_list = ';'.join(out)
     data = data_list.encode('utf-8')
     client_socket.sendall(data)
 

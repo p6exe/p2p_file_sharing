@@ -176,7 +176,7 @@ def get_list_of_files(server_socket):
 
     #reply from server
     data = server_socket.recv(1024)
-    file_list = data.decode('utf-8').split(',')
+    file_list = data.decode('utf-8').split(';')
 
     print(f"List of files: {file_list}")
 
