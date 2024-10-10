@@ -43,17 +43,13 @@ class File:
             self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE + 1
 
         for i in range(self.num_of_chunks):
-            self.chunks[i] = []
+            self.chunks[i] = [client_port]
         self.file_debug()
 
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
             #self.chunks[i] = [client_port]
             self.chunks[i].append(client_port)
-        self.file_debug()
-
-    def chunk_register(self, client_port, chunk_num):
-        self.chunks[chunk_num].append(client_port)
         self.file_debug()
 
     def get_file_locations(self):
@@ -161,9 +157,6 @@ def recv(client_socket):
         if(message == "register"):
             #filename = client_socket.recv(1024)
             register(client_socket)
-        elif(message == "chunk register"):
-            #filename = client_socket.recv(1024)
-            chunk_register(client_socket)
         #closes
         elif(message == "close"):
             close_socket(client_socket)
@@ -187,7 +180,7 @@ def recv(client_socket):
     except OSError as e:
         print(f"OS error: {e}")
         close_socket(client_socket)'''
-
+    
 
 def register(client_socket):
     file_name = (client_socket.recv(1024)).decode('utf-8')                  #recvs filename
@@ -201,24 +194,6 @@ def register(client_socket):
         files[file_name].register_new_client(client_port)
     else:
         newfile = File(file_name, file_size, client_port)
-        newfile.register_new_client(client_port)
-        files[file_name] = newfile
-        print("New file: ", file_name)
-
-def chunk_register(client_socket):
-    file_name = (client_socket.recv(1024)).decode('utf-8')                  #recvs filename
-    send_confirmation(client_socket)
-    chunk_num = int.from_bytes(client_socket.recv(8), byteorder='big')
-    file_size = int.from_bytes(client_socket.recv(8), byteorder='big')   #file size
-    client_port = int.from_bytes(client_socket.recv(8), byteorder='big') #the port of the client
-
-    client_ports[client_socket] = client_port
-    #register new file or adds the user as a file holder
-    if file_name in files:
-        files[file_name].chunk_register(client_port, chunk_num)
-    else:
-        newfile = File(file_name, file_size, client_port)
-        newfile.chunk_register(client_port)
         files[file_name] = newfile
         print("New file: ", file_name)
 
@@ -265,11 +240,6 @@ def receive_file(client_socket, file_name):
 
 def send_file_location(client_socket, file_name):
 
-    file_list = list(files.keys())
-    num_of_files = len(file_list)
-    out=[f"Number of files: {num_of_files}"]
-    for file in file_list:
-        out.append(f"File Name: {file} Size of file: {files[file].file_length}")
     #check if its in the archived file
     if (file_name in files):
         file_locations = files[file_name].get_file_locations()

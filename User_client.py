@@ -44,9 +44,6 @@ def connect_to_server():
         elif(command == "register"):
             file_name = input("File name: ")
             register(server_socket, file_name)
-        elif(command == "chunk register"):
-            file_name = input("File name: ")
-            chunk_register(server_socket, file_name)
         elif(command == "download"):
             file_name = input("File name: ")
             peer_ports = get_file_location(server_socket, file_name)
@@ -238,40 +235,6 @@ def register(server_socket, file_name):
     else:
         print("File doesn't exist")
 
-
-def chunk_register(server_socket, file_name):
-    if os.path.exists(file_name):
-        chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
-        print("num of chunks: ", len(chunks))
-        file_size = os.path.getsize(file_name)
-        chunk_num = int(input("which chunk to send (len-1): "))
-        Selfport = int(input("User port (0 - 65535): " ))
-        
-        server_socket.sendall("chunk register".encode('utf-8'))
-        server_socket.sendall(file_name.encode('utf-8'))
-
-        confirmation = server_socket.recv(1024)
-        if(not confirmation):
-            return
-    
-        server_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
-        server_socket.sendall(file_size.to_bytes(8, byteorder='big'))
-        server_socket.sendall(Selfport.to_bytes(8, byteorder='big'))
-
-        if(file_name in files):
-            if(chunks[chunk_num] not in files[file_name]):
-                files[file_name].append(chunks[chunk_num])
-        else:
-            files[file_name]= chunks[chunk_num]
-        
-            
-        #print("files: ", files)
-
-        start_connection(Selfport) #once registered, user now can be connect from other clients
-
-        print(f"File {file_name} registered with the server!")
-    else:
-        print("File doesn't exist")
 
 '''
 #send file to peer
