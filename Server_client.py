@@ -255,6 +255,7 @@ def send_file_location(client_socket, file_name):
     else:               #no files with this name exists
         client_socket.sendall("NULL".encode('utf-8'))
         print("Not a valid file name")
+
         
 
 def send_list_of_files(client_socket):
