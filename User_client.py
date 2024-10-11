@@ -187,6 +187,7 @@ def get_list_of_files(server_socket):
 
 
 def get_file_location(server_socket, file_name):
+    """
     #request to server 
     server_socket.sendall("file location".encode('utf-8'))
     server_socket.sendall(file_name.encode('utf-8'))
@@ -209,7 +210,32 @@ def get_file_location(server_socket, file_name):
     
     #file_locations =data.decode('utf-8').split(';')
     #print(file_locations)
+
+    """
+     #request to server 
+    server_socket.sendall("file location".encode('utf-8'))
+    server_socket.sendall(file_name.encode('utf-8'))
+
+    #reply from server
+    data = server_socket.recv(1024)
+    file_locations = data.decode('utf-8').split(',')
+
+    if (file_locations[0] == "NULL"):
+        print("Not a valid file")
+        return
+
+    int_list = []
+    for num in file_locations:
+        int_list.append(int(num))
+    print(f"{len(int_list)} endpoints")
     
+    """if (file_locations[0] != "NULL"):
+        print(f'127.0.0.1:{int_list}')
+        return int_list
+    """
+    for port in int_list:
+        print(f'127.0.0.1:{port}')
+        return int_list
     
 
 
