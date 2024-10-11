@@ -16,28 +16,26 @@ establish one connection                            - completed
 establish multiple connects                         - completed
 communication/commands between server and client    - implementing alongside other commands
 receive file/registers a file                       - completed
-monitor the distribution of chunks                  - something something something
+monitor the distribution of chunks                  - completed
 send the user the list of peers                     - completed
 integrity checks
 
 User side:
 establish connection with server            - completed
 get list of peers to download from server   - completed
-establish connection with multiple peers    -
-parallel downloading with multiple peers    -
+establish connection with multiple peers    - completed
+parallel downloading with multiple peers    - compelted
 '''
 
 
 HOST = '127.0.0.1'  # Localhost
 PORT = 58008        # Port 
 
-#File class is used to hold information about a file such as name, chunks, and important funcs
 class File:
-    # contructor initializes values and 
     def __init__(self, file_name, file_size, client_port):
         self.file_name = file_name
         self.file_size = file_size
-        self.chunks = {} #{chunk_num: [client_port]}
+        self.chunks = {} #{chunk_num, [client_port]}
 
         self.chunk_hashes = {} #{chunk_num, chunk hash}
         self.num_of_chunks = 0
@@ -45,11 +43,11 @@ class File:
             self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE
         else:
             self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE + 1
-        # set the files chunks to an empty array so that it can store a list of chunks
+
         for i in range(self.num_of_chunks):
             self.chunks[i] = []
-        self.file_debug() # general purpose output for file and descr. info
-        
+        self.file_debug()
+
     def get_hash(self, chunk_num):
         return self.chunk_hashes[chunk_num]
         
@@ -57,17 +55,17 @@ class File:
         for i in range(len(chunk_hashes)):
             self.chunk_hashes[i] = chunk_hashes[i]
         print(self.chunk_hashes)
-        
+    
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
             #self.chunks[i] = [client_port]
             self.chunks[i].append(client_port)
         self.file_debug()
-    #registers a chunk with between client and server
+
     def chunk_register(self, client_port, chunk_num):
         self.chunks[chunk_num].append(client_port)
         self.file_debug()
-    # appends the location of each file to a list.
+
     def get_file_locations(self):
         file_locations = []
         for chunk in self.chunks:
@@ -84,7 +82,6 @@ class File:
         print("removing port addres: ", userport)
         self.file_debug()
 
-    # outputs the files name size and self.chunks
     def file_debug(self):
         print("file_name: ", self.file_name, "file_size: ", self.file_size)
         print("chunks: ", self.chunks)
@@ -134,10 +131,21 @@ def start_server():
             if(current_socket in send_buffer):
                 send(current_socket, "hello")
 
+''' might delete later 
+#Create a socket
+def create_socket(server_socket):
+    client_socket = 0
+    client_socket, client_address = server_socket.accept()  # Accept a new connection
+    client_addresses[client_address] = client_socket  # Store client in the dictionary
+    print(f"Connected by {client_address}")
+
+    send(client_socket, "hello")
+'''
+
+
 #Send a message to a specific client
 def send(client_socket, message):
     try:
-        #send message to peer
         print(client_socket)
         client_socket.sendall(message.encode('utf-8'))
         print(f"sent to {client_addresses[client_socket]}: {message}")
@@ -170,9 +178,9 @@ def recv(client_socket):
             chunk_register(client_socket)
         elif(message == "close"):
             close_socket(client_socket)
-        elif(message == "file list"): #outputs a list of files, the names, and their sizes
+        elif(message == "file list"):
             send_list_of_files(client_socket)
-        elif(message == "file location"): #outputs a list of where a specified peer can find a file
+        elif(message == "file location"):
             file_name = client_socket.recv(1024).decode('utf-8')
             send_file_location(client_socket, file_name)
         elif(message == "store hash"):
@@ -188,19 +196,23 @@ def recv(client_socket):
             print(hash)
             client_socket.sendall(hash.encode('utf-8'))
             print("sending verify hash")
-        elif(message == "download"): # navigates a peer on where to download a file
+        elif(message == "download"):
             file_name = client_socket.recv(1024).decode('utf-8')
             send_download_info(client_socket, file_name)
-        elif message == "chunk selection":  # navigates the rarity element of finding where a peer should download
-            file_name = client_socket.recv(1024).decode('utf-8')
-            send_download_info(client_socket, file_name)
-
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
-        
+    '''except ConnectionResetError:
+        print("Connection reset by client")
+        close_socket(client_socket)
+    except BrokenPipeError:
+        print("Broken pipe: Client disconnected abruptly")
+        close_socket(client_socket)
+    except OSError as e:
+        print(f"OS error: {e}")
+        close_socket(client_socket)'''
+    
 
-# allows a peer to register a file with the network and that peer becomes an endpoint
 def register(client_socket):
     file_name = (client_socket.recv(1024)).decode('utf-8')                  #recvs filename
     send_confirmation(client_socket)
@@ -217,7 +229,6 @@ def register(client_socket):
         files[file_name] = newfile
         print("New file: ", file_name)
 
-#registers a chunk with the server so a peer can find where to download it from
 def chunk_register(client_socket):
     file_name = (client_socket.recv(1024)).decode('utf-8')                  #recvs filename
     send_confirmation(client_socket)
@@ -242,7 +253,7 @@ def send_download_info(client_socket, file_name):
     client_socket.sendall(num_of_chunks.to_bytes(8, byteorder='big'))
     print(f"download info sent to {client_addresses[client_socket]}")
 
-#receives a file and creates a reference point for other peers
+#receives a file
 def receive_file(client_socket, file_name):
     #Receive the file size from the server
     file_size_data = client_socket.recv(8)  #Expecting 8 bytes for file size
@@ -253,7 +264,6 @@ def receive_file(client_socket, file_name):
     received_size = 0   #total data received
 
     with open(file_name, 'wb') as file:
-        #stores bytes until all are found
         while received_size < file_size:
             remaining_size = file_size - received_size
             chunk_size = min(1024, remaining_size)
@@ -266,7 +276,7 @@ def receive_file(client_socket, file_name):
             received_size += len(chunk)
 
             print(f"Received {received_size}/{file_size} bytes")
-    #output to the file was received if all bytes are present and add the new file to the files dict.
+
     if received_size == file_size:
         print(f"File {file_name} received successfully")
 
@@ -276,7 +286,7 @@ def receive_file(client_socket, file_name):
     else:
         print(f"Error: received only {received_size}/{file_size} bytes")
 
-#outputs list of where to download a file and the number of endpoints
+
 def send_file_location(client_socket, file_name):
 
     #check if its in the archived file
@@ -288,7 +298,6 @@ def send_file_location(client_socket, file_name):
         for num in file_locations:
             str_list.append(str(num))
 
-        #join into a string and send to peer
         data_list = ','.join(str_list)
         client_socket.sendall(data_list.encode('utf-8'))
         print("Sending location")
@@ -296,18 +305,15 @@ def send_file_location(client_socket, file_name):
         client_socket.sendall("NULL".encode('utf-8'))
         print("Not a valid file name")        
 
-#outputs a list of files that can be downloaded from any peer
 def send_list_of_files(client_socket):
-    #uses keys of files to represent names
     file_list = list(files.keys())
     num_of_files = len(file_list)
+
+    out=[f"Number of files: {num_of_files}"]
     
-    out=[f"Number of files: {num_of_files}"] #initial output for number of files
-    #adds each file and its size
     for file in file_list:
         out.append(f"File Name: {file} Size of file: {files[file].file_size}")
     
-    #join output into a string and sent to peer
     data_list = ';'.join(out)
     data = data_list.encode('utf-8')
     client_socket.sendall(data)
@@ -317,12 +323,11 @@ def send_chunk(client_socket, file_name, chunk_num):
     file = files[file_name]
     chunk_hash = file.get_chunk_hash(chunk_num)
     
-    #access file and read in chunks
     with open(file_name, 'rb') as f:
         f.seek(chunk_num * DEFAULT_CHUNK_SIZE)
         chunk = f.read(DEFAULT_CHUNK_SIZE)
-        client_socket.sendall(chunk)  
-        client_socket.sendall(chunk_hash.encode('utf-8'))   # send hashed chunk to peer
+        client_socket.sendall(chunk)  # Send chunk data
+        client_socket.sendall(chunk_hash.encode('utf-8'))  # Send chunk hash
         print(f"Sent chunk {chunk_num} and hash {chunk_hash} to {client_addresses[client_socket]}")
 
 
@@ -352,7 +357,6 @@ def close_socket(client_socket):
     del client_addresses[client_socket]
 
 
-# confirmation message to peer
 def send_confirmation(client_socket):
     client_socket.sendall("confirm".encode('utf-8'))
 
@@ -360,28 +364,6 @@ def send_confirmation(client_socket):
 def debugger(client_socket):
     print(sockets_list)
     print("using ", client_socket)
-
-# information relating to chunk selection. Sends data about a peer that owns a file
-def send_download_info(client_socket, file_name):
-    # Send default chunk size
-    client_socket.sendall(DEFAULT_CHUNK_SIZE.to_bytes(8, byteorder='big'))
-    #get number of chunks for the file
-    num_of_chunks = files[file_name].get_num_of_chunks()
-    client_socket.sendall(num_of_chunks.to_bytes(8, byteorder='big'))
-    print(f"Download info sent to {client_addresses[client_socket]}")
-
-    # After sending download info, get chunk availability from all clients holding this file
-    chunk_availability = files[file_name].get_file_locations()  # Adjust this to retrieve chunk info
-    availability_info = f"Chunk availability for {file_name}:"
-
-    # build the availability message
-    for chunk_num in range(files[file_name].get_num_of_chunks()):
-        peers = files[file_name].chunks[chunk_num]  # Get peers for each chunk
-        availability_info += f"\nChunk {chunk_num}: Available from peers: {', '.join(map(str, peers)) if peers else 'None'}"
-
-    #Send the availability information to the client
-    client_socket.sendall(availability_info.encode('utf-8'))
-    print(f"Sent chunk availability to {client_addresses[client_socket]}: {availability_info}")
 
 
 if __name__ == '__main__':
