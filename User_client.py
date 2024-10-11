@@ -52,8 +52,10 @@ def connect_to_server():
             file_name = input("File name: ")
             peer_ports = get_file_location(server_socket, file_name)
             if(peer_ports):
-                print("stinky")
                 download_from_peers(server_socket, peer_ports, file_name)
+        elif(command == "chunk selection"):
+            file_name = input("File name: ")
+            chunk_selection(server_socket, file_name)
         else:
             print("type help for commands: ",commands)
 
@@ -95,20 +97,6 @@ def start_connection(Selfport):
                 sockets_list.remove(current_socket)
 
                 print("Request file: ", file_name, " chunk: ", chunk_num, " from: ", socket_addr[current_socket])
-
-        #doesnt work
-        '''#send teh chunk to the peer
-        for current_socket in writable:
-            if(current_socket in send_buffer):
-                chunk_num = send_buffer[current_socket][0]
-                print("sending chunk num ",chunk_num, "of file", file_name)
-                current_socket.sendall(files[file_name][chunk_num])
-                send_buffer.remove(current_socket)
-
-                #del socket from buffer once all chunks are sent
-                if(not send_buffer[current_socket]):
-                    del send_buffer[current_socket]'''
-
 
 #download from peers
 def download_from_peers(server_socket, peer_ports, file_name):
@@ -182,37 +170,12 @@ def get_list_of_files(server_socket):
     data = server_socket.recv(1024)
     file_list = data.decode('utf-8').split(';')
 
-    print(f"List of files: {file_list}")
+    print(f"{file_list}")
 
 
 
 def get_file_location(server_socket, file_name):
-    """
     #request to server 
-    server_socket.sendall("file location".encode('utf-8'))
-    server_socket.sendall(file_name.encode('utf-8'))
-
-    #reply from server
-    data = server_socket.recv(1024)
-    parts= data.decode('utf-8').split('#')
-    
-    if (parts[0] == "NULL"):
-        print("Not a valid file")
-        return
-    formattedOut = parts[0].split(';')
-    print(formattedOut)
-
-    if len(parts) > 1:
-        file_locations = parts[1].split('#')
-        int_list = [int(num) for num in file_locations]
-        #print("Port numbers:", int_list)
-        return int_list
-    
-    #file_locations =data.decode('utf-8').split(';')
-    #print(file_locations)
-
-    """
-     #request to server 
     server_socket.sendall("file location".encode('utf-8'))
     server_socket.sendall(file_name.encode('utf-8'))
 
@@ -227,12 +190,8 @@ def get_file_location(server_socket, file_name):
     int_list = []
     for num in file_locations:
         int_list.append(int(num))
+
     print(f"{len(int_list)} endpoints")
-    
-    """if (file_locations[0] != "NULL"):
-        print(f'127.0.0.1:{int_list}')
-        return int_list
-    """
     for port in int_list:
         print(f'127.0.0.1:{port}')
         return int_list
@@ -303,29 +262,6 @@ def chunk_register(server_socket, file_name):
     else:
         print("File doesn't exist")
 
-'''
-#send file to peer
-def send_file(peer_socket, file_name):
-
-    peer_socket.sendall("register".encode('utf-8'))
-
-    with open(file_name, 'rb') as file:
-
-        #Send the size of the file
-        file_size = os.path.getsize(file_name)
-        peer_socket.sendall(file_size.to_bytes(8, byteorder='big'))
-
-        #Read the file in chunks and send each chunk
-        while True:
-            chunk = file.read(1024)
-            if not chunk:  # If no more data, break out of the loop
-                break
-            peer_socket.sendall(chunk)
-
-    print(f"File {file_name} sent successfully!")
-'''
-
-
 # helper func to verify the hash of the downloaded chunk
 def verify_chunk(chunk_data, expected_hash):
     received_hash = hashlib.sha256(chunk_data).hexdigest()
@@ -380,6 +316,48 @@ def close_client(server_socket):
     server_socket.close()
     print("closing")
     
+def chunk_selection(server_socket, file_name):
+    server_socket.sendall("chunk selection".encode('utf-8'))  # Send request for chunk selection
+    server_socket.sendall(file_name.encode('utf-8'))  # Send the filename
+
+    availability_data = server_socket.recv(1024).decode('utf-8')
+    if availability_data == "NULL":
+        print("No such file exists on the server.")
+        return
+
+    # Parse the availability data
+    availability = {}
+    lines = availability_data.split('\n')
+    for line in lines:
+        if line:  # Ensure line is not empty
+            parts = line.split(':')
+            if len(parts) >= 2:  # Check that parts has at least 2 elements
+                try:
+                    chunk_num = int(parts[0].split()[1])
+                    count = int(parts[1].strip().split()[0])
+                    availability[chunk_num] = count
+                except (ValueError, IndexError):
+                    print(f"Invalid format in line: {line}")
+            else:
+                print(f"Invalid format in line: {line}")
+
+    # Ensure there are available chunks before proceeding
+    if not availability:
+        print("No chunks available for download.")
+        return
+
+    # Select the rarest chunk
+    rarest_chunk = min(availability, key=availability.get)
+    rarest_chunk_count = availability[rarest_chunk]
+    print(f"The rarest chunk is {rarest_chunk} with {rarest_chunk_count} peers holding it.")
+
+    # Now initiate the download process for the rarest chunk
+    download_chunk(server_socket, file_name, rarest_chunk)
+
+def download_chunk(server_socket, file_name, chunk_num):
+    # Here you would send a request to the server or relevant peer to download the specified chunk
+    print(f"Downloading chunk {chunk_num} of file {file_name}.")
+    # Implement the download logic as needed
 
 if __name__ == '__main__':
     connect_to_server()

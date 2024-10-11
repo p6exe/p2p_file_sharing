@@ -131,18 +131,6 @@ def start_server():
             if(current_socket in send_buffer):
                 send(current_socket, "hello")
 
-''' might delete later 
-#Create a socket
-def create_socket(server_socket):
-    client_socket = 0
-    client_socket, client_address = server_socket.accept()  # Accept a new connection
-    client_addresses[client_address] = client_socket  # Store client in the dictionary
-    print(f"Connected by {client_address}")
-
-    send(client_socket, "hello")
-'''
-
-
 #Send a message to a specific client
 def send(client_socket, message):
     try:
@@ -185,18 +173,13 @@ def recv(client_socket):
         elif(message == "download"):
             file_name = client_socket.recv(1024).decode('utf-8')
             send_download_info(client_socket, file_name)
+        elif message == "chunk selection": 
+            file_name = client_socket.recv(1024).decode('utf-8')
+            send_download_info(client_socket, file_name)
+
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
-    '''except ConnectionResetError:
-        print("Connection reset by client")
-        close_socket(client_socket)
-    except BrokenPipeError:
-        print("Broken pipe: Client disconnected abruptly")
-        close_socket(client_socket)
-    except OSError as e:
-        print(f"OS error: {e}")
-        close_socket(client_socket)'''
 
 
 def register(client_socket):
@@ -274,38 +257,6 @@ def receive_file(client_socket, file_name):
 
 
 def send_file_location(client_socket, file_name):
-    """
-    num_of_endpoints = len(files[file_name].get_file_locations())
-    out=[f"Number of endpoints: {num_of_endpoints}"]
-    for port in files[file_name].get_file_locations():
-        out.append(f"Chunks at 127.0.0.1:{port}")
-    formattedOut = ';'.join(out)
-    #client_socket.sendall(formattedOut.encode('utf-8'))
-
-    #check if its in the archived file
-    if (file_name in files):
-        file_locations = files[file_name].get_file_locations()
-
-        #converts the integers to strings
-        str_list = []
-        for num in file_locations:
-            str_list.append(str(num))
-        
-        data_list = ';'.join(str_list)
-        combinedMess = formattedOut + '#' + data_list   
-        client_socket.sendall(combinedMess.encode('utf-8'))
-        print(combinedMess)
-        print("Sending location")
-    else:               #no files with this name exists
-        client_socket.sendall("NULL".encode('utf-8'))
-        print("Not a valid file name")
-    """
-    
-    file_list = list(files.keys())
-    num_of_files = len(file_list)
-    #out=[f"Number of files: {num_of_files}"]
-    #for file in file_list:
-     #   out.append(f"File Name: {file} Size of file: {files[file].file_length}")
     #check if its in the archived file
     if (file_name in files):
         file_locations = files[file_name].get_file_locations()
@@ -381,6 +332,31 @@ def send_confirmation(client_socket):
 def debugger(client_socket):
     print(sockets_list)
     print("using ", client_socket)
+
+def send_download_info(client_socket, file_name):
+    # Send default chunk size
+    client_socket.sendall(DEFAULT_CHUNK_SIZE.to_bytes(8, byteorder='big'))
+    # Get number of chunks for the file
+    num_of_chunks = files[file_name].get_num_of_chunks()
+    client_socket.sendall(num_of_chunks.to_bytes(8, byteorder='big'))
+    print(f"Download info sent to {client_addresses[client_socket]}")
+
+    # After sending download info, send chunk availability
+    send_chunk_availability(client_socket, file_name)
+
+def send_chunk_availability(client_socket, file_name):
+    # Get chunk availability from all clients holding this file
+    chunk_availability = files[file_name].get_file_locations()  # Adjust this to retrieve chunk info
+    availability_info = f"Chunk availability for {file_name}:"
+
+    # Build the availability message
+    for chunk_num in range(files[file_name].get_num_of_chunks()):
+        peers = files[file_name].chunks[chunk_num]  # Get peers for each chunk
+        availability_info += f"\nChunk {chunk_num}: Available from peers: {', '.join(map(str, peers)) if peers else 'None'}"
+
+    # Send the availability information to the client
+    client_socket.sendall(availability_info.encode('utf-8'))
+    print(f"Sent chunk availability to {client_addresses[client_socket]}: {availability_info}")
 
 
 if __name__ == '__main__':
