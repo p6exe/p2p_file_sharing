@@ -37,6 +37,7 @@ class File:
         self.file_size = file_size
         self.chunks = {} #{chunk_num, [client_port]}
 
+        self.chunk_hashes = {}
         self.num_of_chunks = 0
         if (file_size % DEFAULT_CHUNK_SIZE == 0):
             self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE
