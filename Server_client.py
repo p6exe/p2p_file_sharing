@@ -48,15 +48,9 @@ class File:
             self.chunks[i] = []
         self.file_debug()
 
-    def compute_chunk_hashes(self, chunk_num):
-        # Open the file and compute the hash for each chunk
-        with open(self.file_name, 'rb') as file:
-            for chunk_num in range(self.num_of_chunks):
-                chunk = file.read(DEFAULT_CHUNK_SIZE)
-                chunk_hash = hashlib.sha256(chunk).hexdigest()  # Compute the hash
-                self.chunk_hashes[chunk_num] = chunk_hash
-                print(f"Chunk {chunk_num} hash: {chunk_hash}")
-
+    def get_hash(self, chunk_num):
+        return self.chunk_hashes[chunk_num]
+        
     def store_hashes(self, chunk_hashes):
         for i in range(len(chunk_hashes)):
             self.chunk_hashes[i] = chunk_hashes[i]
@@ -173,6 +167,7 @@ def recv(client_socket):
             close_socket(client_socket)
         
         message = data.decode('utf-8')
+        message = message.strip()
         #takes in commands from the user:
         if(message == "register"):
             #filename = client_socket.recv(1024)
@@ -193,9 +188,14 @@ def recv(client_socket):
             chunk_hashes = client_socket.recv(1024).decode('utf-8').split(',')
             files[file_name].store_hashes(chunk_hashes)
         elif(message == "verify chunk"):
+            send_confirmation(client_socket)
             file_name = client_socket.recv(1024).decode('utf-8')
-            chunk_num = client_socket.recv(8).decode('utf-8')
-            hash = files[file_name].compute_chunk_hashes(chunk_num)
+            chunk_num = int.from_bytes(client_socket.recv(8), byteorder='big')
+            print(chunk_num)
+            hash = files[file_name].get_hash(chunk_num)
+            print(hash)
+            client_socket.sendall(hash.encode('utf-8'))
+            print("sending verify hash")
         elif(message == "download"):
             file_name = client_socket.recv(1024).decode('utf-8')
             send_download_info(client_socket, file_name)

@@ -115,6 +115,7 @@ def start_connection(st, Selfport):
                     del send_buffer[current_socket]'''
 
 
+
 #download from peers
 def download_from_peers(server_socket, peer_ports, file_name):
     server_socket.sendall("download".encode('utf-8'))
@@ -176,7 +177,7 @@ def download_from_peers(server_socket, peer_ports, file_name):
     file_integrity = True
     #checks the integrity of file
     for i in range(len(chunks)):
-        right_integrity = download_and_verify_chunk(server_socket, file_name, i)
+        right_integrity = download_and_verify_chunk(server_socket, file_name, chunks[i], i)
         if(right_integrity == False):
             chunks[i] = None
 
@@ -250,7 +251,6 @@ def get_file_location(server_socket, file_name):
         print(f'127.0.0.1:{port}')
     return int_list
     
-
 
 #registers a file with the server
 '''
@@ -340,10 +340,12 @@ def verify_chunk(chunk_data, expected_hash):
 def download_and_verify_chunk(server_socket, file_name, chunk, chunk_num):
     #chunk = server_socket.recv(DEFAULT_CHUNK_SIZE)  # Receive chunk data
     server_socket.sendall("verify chunk".encode('utf-8'))
+    confirmation = server_socket.recv(1024)
+    if(not confirmation):
+        return
     server_socket.sendall(file_name.encode('utf-8'))
     server_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
     chunk_hash = server_socket.recv(64).decode('utf-8')  # Receive chunk hash (SHA-256 hex is 64 chars)
-
     # Verify the chunk data
     if verify_chunk(chunk, chunk_hash):
         print(f"Chunk {chunk_num} matches hash")
