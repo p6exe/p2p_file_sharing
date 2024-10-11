@@ -12,7 +12,9 @@ file_name = [] #current stores the file name since the file will be stored local
 #established when the user enters the value into the command:
 SELFHOST = HOST         #client ip address
 
-files = {}   #file_name: {chunks}, file is added when calling register
+
+files = {}   #{file_name: {chunks}}, file is added when calling register
+Selfport = 0
 DEFAULT_CHUNK_SIZE = 4096 #const set to 4096 bytes
 
 #Connects to the server socket
@@ -27,7 +29,9 @@ def connect_to_server():
     # Receive a response from the server
     while(close_flag == True):
         #takes a comamnd from the user and determines what operation to perform
-        commands = [recv]
+        commands = ["close","file list","file location","register","chunk register","download"]
+        print("Commands: ",commands)
+
         command = input("command: ").lower()
 
         if(command == "recv"):  # receieve a message from the server
@@ -58,15 +62,16 @@ def connect_to_server():
             file_name = input("File name: ")
             chunk_selection(server_socket, file_name)
         else:
-            print("type help for commands: ",commands)
+            print("not a valid command: ",commands)
 
 
 #Allow other peers to connect to this user, 
 # use a thread
-def start_connection(Selfport):
+def start_connection(st, Selfport):
     
     sockets_list = []   # List of all sockets (including server socket)
     socket_addr = {} 
+
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, Selfport))
     self_socket.listen(4)     #Listen for incoming connections
@@ -99,6 +104,7 @@ def start_connection(Selfport):
                 sockets_list.remove(current_socket)
 
                 print("Request file: ", file_name, " chunk: ", chunk_num, " from: ", socket_addr[current_socket])
+
 
 #download from peers
 def download_from_peers(server_socket, peer_ports, file_name):
@@ -147,9 +153,18 @@ def download_from_peers(server_socket, peer_ports, file_name):
             peer_sockets_list.remove(peer_socket)
             peer_socket.close()
 
+            
     #registers the file with the server upon downloading
     register(server_socket, file_name)
-    #writes a new file
+    
+    file_integrity = True
+    #checks the integrity of file
+    for i in range(len(chunks)):
+        right_integrity = download_and_verify_chunk(server_socket, file_name, chunks[i], i)
+        if(right_integrity == False):
+            chunks[i] = None
+
+    #combiners the data
     with open("newfile.txt", 'wb') as file:
         for chunk in chunks:
             file.write(chunk)
@@ -161,18 +176,19 @@ def get_list_of_files(server_socket):
 
     #reply from server
     data = server_socket.recv(1024)
-    file_list = data.decode('utf-8').split(';')
+    file_list = data.decode('utf-8').split(',')
 
     print(f"{file_list}")
 
+
 def get_file_location(server_socket, file_name):
-    #request to server 
+
+     #request to server 
     server_socket.sendall("file location".encode('utf-8'))
     server_socket.sendall(file_name.encode('utf-8'))
 
     #reply from server
-    data = server_socket.recv(1024)
-    file_locations = data.decode('utf-8').split(',')
+    file_locations = server_socket.recv(1024).decode('utf-8').split(',')
 
     # ensures a valid file
     if (file_locations[0] == "NULL"):
@@ -185,11 +201,11 @@ def get_file_location(server_socket, file_name):
         int_list.append(int(num))
 
     print(f"{len(int_list)} endpoints") # outputs the number of endpoints
+ 
     for port in int_list:
         print(f'127.0.0.1:{port}') # outputs each peers IP:Port (all are local host) 
-        return int_list
+    return int_list
     
-
 
 #registers a file with the server
 '''
@@ -200,8 +216,6 @@ def register(server_socket, file_name):
     # ensures the file exists in the working directory
     if os.path.exists(file_name):
         file_size = os.path.getsize(file_name)
-        #user assigns an unused port
-        Selfport = int(input("User port (0 - 65535): " ))
 
         #sends commands command and file name to server
         server_socket.sendall("register".encode('utf-8'))
@@ -218,7 +232,8 @@ def register(server_socket, file_name):
         files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         #print("files: ", files)
 
-        start_connection(Selfport) #once registered, user now can be connect from other clients
+        send_hash(server_socket, file_name)
+        #start_connection(Selfport) #once registered, user now can be connect from other clients
 
         print(f"File {file_name} registered with the server!")
     else:
@@ -236,7 +251,6 @@ def chunk_register(server_socket, file_name):
 
         #input from user for chunnk and assigned port
         chunk_num = int(input("which chunk to send (len-1): "))
-        Selfport = int(input("User port (0 - 65535): " ))
         
         server_socket.sendall("chunk register".encode('utf-8'))
         server_socket.sendall(file_name.encode('utf-8'))
@@ -250,14 +264,9 @@ def chunk_register(server_socket, file_name):
         server_socket.sendall(Selfport.to_bytes(8, byteorder='big'))
 
         #append the chunk to a list of chunks for the file, o.w. create first chunk
-        if(file_name in files):
-            if(chunks[chunk_num] not in files[file_name]):
-                files[file_name].append(chunks[chunk_num])
-        else:
-            files[file_name]= chunks[chunk_num]
+        files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         
-
-        start_connection(Selfport) #once registered, user now can be connect from other clients
+        
 
         print(f"File {file_name} registered with the server!")
     else:
@@ -268,12 +277,19 @@ def verify_chunk(chunk_data, expected_hash):
     received_hash = hashlib.sha256(chunk_data).hexdigest()
     return received_hash == expected_hash
 
-# downloads a chunk and uses the helper to verify. It should match the hash calculated by the server
-def download_and_verify_chunk(peer_socket, file_name, chunk_num):
-    chunk = peer_socket.recv(DEFAULT_CHUNK_SIZE)  
-    chunk_hash = peer_socket.recv(64).decode('utf-8') 
 
-    # use helper func to verify the chunk data
+# Downloads a chunk and uses the helper to verify
+def download_and_verify_chunk(server_socket, file_name, chunk, chunk_num):
+    #chunk = server_socket.recv(DEFAULT_CHUNK_SIZE)  # Receive chunk data
+    server_socket.sendall("verify chunk".encode('utf-8'))
+    confirmation = server_socket.recv(1024)
+    if(not confirmation):
+        return
+    server_socket.sendall(file_name.encode('utf-8'))
+    server_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
+    chunk_hash = server_socket.recv(64).decode('utf-8')  # Receive chunk hash (SHA-256 hex is 64 chars)
+    # Verify the chunk data
+
     if verify_chunk(chunk, chunk_hash):
         #outuput the match and store file
         print(f"Chunk {chunk_num} matches hash")
@@ -281,6 +297,23 @@ def download_and_verify_chunk(peer_socket, file_name, chunk_num):
             f.write(chunk)
     else: #discard if hashes differ
         print(f"Chunk {chunk_num} wrong chunk")
+
+
+def send_hash(server_socket, file_name):
+    server_socket.sendall("store hash".encode('utf-8'))
+
+    chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+    chunk_hashes = []
+    for chunk_num in range(len(chunks)):
+        chunk_hash = hashlib.sha256(chunks[chunk_num]).hexdigest()  # Compute the hash
+        chunk_hashes.append(chunk_hash)
+        print(f"Chunk {chunk_num} hash: {chunk_hash}")
+    data_list = ','.join(chunk_hashes)
+    server_socket.sendall(file_name.encode('utf-8'))
+    server_socket.sendall(data_list.encode('utf-8'))
+
+    print("sent hash to server")
+
 
 # takes a file and splits into multiple chunks based on DEFAULT_CHUNK_SIZE. @return a list of chunks
 def split_file_into_chunks(file_path, chunk_size):
@@ -374,4 +407,12 @@ def download_chunk(server_socket, file_name, chunk_num):
         print(f"Failed to receive chunk {chunk_num} of file {file_name}.")
 
 if __name__ == '__main__':
-    connect_to_server()
+    Selfport = int(input("User port (0 - 65535): " ))
+    thread1 = threading.Thread(target=connect_to_server)
+    thread2 = threading.Thread(target=start_connection, args = ("localhost", Selfport))
+    thread2.start()
+    thread1.start()
+    
+
+
+    

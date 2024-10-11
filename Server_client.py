@@ -39,6 +39,7 @@ class File:
         self.file_size = file_size
         self.chunks = {} #{chunk_num: [client_port]}
 
+        self.chunk_hashes = {} #{chunk_num, chunk hash}
         self.num_of_chunks = 0
         if (file_size % DEFAULT_CHUNK_SIZE == 0):
             self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE
@@ -48,17 +49,15 @@ class File:
         for i in range(self.num_of_chunks):
             self.chunks[i] = []
         self.file_debug() # general purpose output for file and descr. info
-
-    #calculate hashes for a chunk using SHA-256
-    def compute_chunk_hashes(self):
-        # Open the file and compute the hash for each chunk
-        with open(self.file_name, 'rb') as file:
-            for chunk_num in range(self.num_of_chunks):
-                chunk = file.read(DEFAULT_CHUNK_SIZE)
-                chunk_hash = hashlib.sha256(chunk).hexdigest()  # Compute  hash with SHA 256
-                self.chunk_hashes[chunk_num] = chunk_hash
-                print(f"Chunk {chunk_num} hash: {chunk_hash}")
-    # adds a client port to each chunk
+        
+    def get_hash(self, chunk_num):
+        return self.chunk_hashes[chunk_num]
+        
+    def store_hashes(self, chunk_hashes):
+        for i in range(len(chunk_hashes)):
+            self.chunk_hashes[i] = chunk_hashes[i]
+        print(self.chunk_hashes)
+        
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
             #self.chunks[i] = [client_port]
@@ -74,7 +73,7 @@ class File:
         for chunk in self.chunks:
             file_locations.append(self.chunks[chunk][0])
         return file_locations
-    
+
     def get_num_of_chunks(self):
         return self.num_of_chunks
 
@@ -160,14 +159,15 @@ def recv(client_socket):
             close_socket(client_socket)
         
         message = data.decode('utf-8')
+        message = message.strip()
         #takes in commands from the user:
         if(message == "register"):
             #filename = client_socket.recv(1024)
             register(client_socket)
+        #closes
         elif(message == "chunk register"):
             #filename = client_socket.recv(1024)
             chunk_register(client_socket)
-        #closes
         elif(message == "close"):
             close_socket(client_socket)
         elif(message == "file list"): #outputs a list of files, the names, and their sizes
@@ -175,6 +175,19 @@ def recv(client_socket):
         elif(message == "file location"): #outputs a list of where a specified peer can find a file
             file_name = client_socket.recv(1024).decode('utf-8')
             send_file_location(client_socket, file_name)
+        elif(message == "store hash"):
+            file_name = client_socket.recv(1024).decode('utf-8')
+            chunk_hashes = client_socket.recv(1024).decode('utf-8').split(',')
+            files[file_name].store_hashes(chunk_hashes)
+        elif(message == "verify chunk"):
+            send_confirmation(client_socket)
+            file_name = client_socket.recv(1024).decode('utf-8')
+            chunk_num = int.from_bytes(client_socket.recv(8), byteorder='big')
+            print(chunk_num)
+            hash = files[file_name].get_hash(chunk_num)
+            print(hash)
+            client_socket.sendall(hash.encode('utf-8'))
+            print("sending verify hash")
         elif(message == "download"): # navigates a peer on where to download a file
             file_name = client_socket.recv(1024).decode('utf-8')
             send_download_info(client_socket, file_name)
@@ -185,7 +198,7 @@ def recv(client_socket):
     except ConnectionError as e:
         #Handle client disconnection
         close_socket(client_socket)
-
+        
 
 # allows a peer to register a file with the network and that peer becomes an endpoint
 def register(client_socket):
@@ -218,7 +231,7 @@ def chunk_register(client_socket):
         files[file_name].chunk_register(client_port, chunk_num)
     else:
         newfile = File(file_name, file_size, client_port)
-        newfile.chunk_register(client_port)
+        newfile.chunk_register(client_port, chunk_num)
         files[file_name] = newfile
         print("New file: ", file_name)
 
@@ -265,6 +278,7 @@ def receive_file(client_socket, file_name):
 
 #outputs list of where to download a file and the number of endpoints
 def send_file_location(client_socket, file_name):
+
     #check if its in the archived file
     if (file_name in files):
         file_locations = files[file_name].get_file_locations()
