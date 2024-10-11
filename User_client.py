@@ -2,6 +2,7 @@ import socket
 import select
 import threading
 import os
+import hashlib
 
 HOST = '127.0.0.1'  #The server's hostname or IP address
 PORT = 58008        #The port used by the server
@@ -187,7 +188,32 @@ def get_list_of_files(server_socket):
 
 
 def get_file_location(server_socket, file_name):
+    """
     #request to server 
+    server_socket.sendall("file location".encode('utf-8'))
+    server_socket.sendall(file_name.encode('utf-8'))
+
+    #reply from server
+    data = server_socket.recv(1024)
+    parts= data.decode('utf-8').split('#')
+    
+    if (parts[0] == "NULL"):
+        print("Not a valid file")
+        return
+    formattedOut = parts[0].split(';')
+    print(formattedOut)
+
+    if len(parts) > 1:
+        file_locations = parts[1].split('#')
+        int_list = [int(num) for num in file_locations]
+        #print("Port numbers:", int_list)
+        return int_list
+    
+    #file_locations =data.decode('utf-8').split(';')
+    #print(file_locations)
+
+    """
+     #request to server 
     server_socket.sendall("file location".encode('utf-8'))
     server_socket.sendall(file_name.encode('utf-8'))
 
@@ -200,13 +226,16 @@ def get_file_location(server_socket, file_name):
     int_list = []
     for num in file_locations:
         int_list.append(int(num))
+    print(f"{len(int_list)} endpoints")
     
-    if (file_locations[0] != "NULL"):
-        
-        print(f"{file_name} Chunk locations: {int_list}")
+    """if (file_locations[0] != "NULL"):
+        print(f'127.0.0.1:{int_list}')
         return int_list
-        
-
+    """
+    for port in int_list:
+        print(f'127.0.0.1:{port}')
+        return int_list
+    
 
 
 #registers a file with the server
@@ -292,6 +321,25 @@ def send_file(peer_socket, file_name):
     print(f"File {file_name} sent successfully!")
 '''
 
+
+# helper func to verify the hash of the downloaded chunk
+def verify_chunk(chunk_data, expected_hash):
+    received_hash = hashlib.sha256(chunk_data).hexdigest()
+    return received_hash == expected_hash
+
+# Downloads a chunk and uses the helper to verify
+def download_and_verify_chunk(peer_socket, file_name, chunk_num):
+    chunk = peer_socket.recv(DEFAULT_CHUNK_SIZE)  # Receive chunk data
+    chunk_hash = peer_socket.recv(64).decode('utf-8')  # Receive chunk hash (SHA-256 hex is 64 chars)
+
+    # Verify the chunk data
+    if verify_chunk(chunk, chunk_hash):
+        print(f"Chunk {chunk_num} matches hash")
+        # Save the chunk
+        with open(file_name, 'ab') as f:
+            f.write(chunk)
+    else:
+        print(f"Chunk {chunk_num} wrong chunk")
 
 def split_file_into_chunks(file_path, chunk_size):
     chunks = []
