@@ -13,6 +13,8 @@ SELFHOST = HOST         #client ip address
 
 files = {}   #{file_name: {chunks}}, file is added when calling register
 DEFAULT_CHUNK_SIZE = 4096
+threads = []
+Selfport = 0
 
 #Connects to the server socket
 def connect_to_server():
@@ -25,7 +27,8 @@ def connect_to_server():
 
     # Receive a response from the server
     while(close_flag == True):
-        commands = [recv]
+        commands = ["close","file list","file location","register","chunk register","download"]
+        print("Commands: ",commands)
         command = input("command: ").lower()
 
         if(command == "recv"): 
@@ -51,18 +54,18 @@ def connect_to_server():
             file_name = input("File name: ")
             peer_ports = get_file_location(server_socket, file_name)
             if(peer_ports):
-                print("stinky")
                 download_from_peers(server_socket, peer_ports, file_name)
         else:
-            print("type help for commands: ",commands)
+            print("not a valid command: ",commands)
 
 
 #Allow other peers to connect to this user, 
 # use a thread
-def start_connection(Selfport):
+def start_connection(st, Selfport):
     
     sockets_list = []   # List of all sockets (including server socket)
     socket_addr = {} 
+
     self_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a socket
     self_socket.bind((HOST, Selfport))
     self_socket.listen(4)     #Listen for incoming connections
@@ -181,6 +184,7 @@ def get_list_of_files(server_socket):
     data = server_socket.recv(1024)
     file_list = data.decode('utf-8').split(',')
 
+    
     print(f"List of files: {file_list}")
 
 
@@ -191,9 +195,7 @@ def get_file_location(server_socket, file_name):
     server_socket.sendall(file_name.encode('utf-8'))
 
     #reply from server
-    data = server_socket.recv(1024)
-    file_locations = data.decode('utf-8').split(',')
-
+    file_locations = server_socket.recv(1024).decode('utf-8').split(',')
     if (file_locations[0] == "NULL"):
         print("Not a valid file")
         return
@@ -203,7 +205,8 @@ def get_file_location(server_socket, file_name):
         int_list.append(int(num))
     
     if (file_locations[0] != "NULL"):
-        print("File locations: ", int_list)
+        
+        print(f"{file_name} Chunk locations: {int_list}")
         return int_list
         
 
@@ -217,7 +220,6 @@ client gives the server:
 def register(server_socket, file_name):
     if os.path.exists(file_name):
         file_size = os.path.getsize(file_name)
-        Selfport = int(input("User port (0 - 65535): " ))
 
         server_socket.sendall("register".encode('utf-8'))
         server_socket.sendall(file_name.encode('utf-8'))
@@ -232,7 +234,8 @@ def register(server_socket, file_name):
         files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         #print("files: ", files)
 
-        start_connection(Selfport) #once registered, user now can be connect from other clients
+
+        #start_connection(Selfport) #once registered, user now can be connect from other clients
 
         print(f"File {file_name} registered with the server!")
     else:
@@ -245,7 +248,6 @@ def chunk_register(server_socket, file_name):
         print("num of chunks: ", len(chunks))
         file_size = os.path.getsize(file_name)
         chunk_num = int(input("which chunk to send (len-1): "))
-        Selfport = int(input("User port (0 - 65535): " ))
         
         server_socket.sendall("chunk register".encode('utf-8'))
         server_socket.sendall(file_name.encode('utf-8'))
@@ -264,10 +266,8 @@ def chunk_register(server_socket, file_name):
         else:
             files[file_name]= chunks[chunk_num]
         
-            
-        #print("files: ", files)
 
-        start_connection(Selfport) #once registered, user now can be connect from other clients
+        #start_connection(Selfport) #once registered, user now can be connect from other clients
 
         print(f"File {file_name} registered with the server!")
     else:
@@ -333,4 +333,12 @@ def close_client(server_socket):
     
 
 if __name__ == '__main__':
-    connect_to_server()
+    Selfport = int(input("User port (0 - 65535): " ))
+    thread2 = threading.Thread(target=start_connection, args = ("localhost", Selfport))
+    thread1 = threading.Thread(target=connect_to_server)
+    thread2.start()
+    thread1.start()
+    
+
+
+    
