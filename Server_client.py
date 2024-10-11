@@ -16,15 +16,15 @@ establish one connection                            - completed
 establish multiple connects                         - completed
 communication/commands between server and client    - implementing alongside other commands
 receive file/registers a file                       - completed
-monitor the distribution of chunks                  - completed
+monitor the distribution of chunks                  - something something something
 send the user the list of peers                     - completed
 integrity checks
 
 User side:
 establish connection with server            - completed
 get list of peers to download from server   - completed
-establish connection with multiple peers    - completed
-parallel downloading with multiple peers    - compelted
+establish connection with multiple peers    -
+parallel downloading with multiple peers    -
 '''
 
 
@@ -366,5 +366,32 @@ def debugger(client_socket):
     print("using ", client_socket)
 
 
+'''
+#selection doesn't work
+def send_download_info(client_socket, file_name):
+    # Send default chunk size
+    client_socket.sendall(DEFAULT_CHUNK_SIZE.to_bytes(8, byteorder='big'))
+    # Get number of chunks for the file
+    num_of_chunks = files[file_name].get_num_of_chunks()
+    client_socket.sendall(num_of_chunks.to_bytes(8, byteorder='big'))
+    print(f"Download info sent to {client_addresses[client_socket]}")
+
+    # After sending download info, send chunk availability
+    send_chunk_availability(client_socket, file_name)
+
+def send_chunk_availability(client_socket, file_name):
+    # Get chunk availability from all clients holding this file
+    chunk_availability = files[file_name].get_file_locations()  # Adjust this to retrieve chunk info
+    availability_info = f"Chunk availability for {file_name}:"
+
+    # Build the availability message
+    for chunk_num in range(files[file_name].get_num_of_chunks()):
+        peers = files[file_name].chunks[chunk_num]  # Get peers for each chunk
+        availability_info += f"\nChunk {chunk_num}: Available from peers: {', '.join(map(str, peers)) if peers else 'None'}"
+
+    # Send the availability information to the client
+    client_socket.sendall(availability_info.encode('utf-8'))
+    print(f"Sent chunk availability to {client_addresses[client_socket]}: {availability_info}")
+'''
 if __name__ == '__main__':
     start_server()

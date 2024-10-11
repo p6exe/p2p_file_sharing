@@ -407,6 +407,51 @@ def close_client(server_socket):
     server_socket.close()
     print("closing")
     
+'''
+#select doesn't work
+def chunk_selection(server_socket, file_name):
+    server_socket.sendall("chunk selection".encode('utf-8'))  # Send request for chunk selection
+    server_socket.sendall(file_name.encode('utf-8'))  # Send the filename
+
+    availability_data = server_socket.recv(1024).decode('utf-8')
+    if availability_data == "NULL":
+        print("No such file exists on the server.")
+        return
+
+    # Parse the availability data
+    availability = {}
+    lines = availability_data.split('\n')
+    for line in lines:
+        if line:  # Ensure line is not empty
+            parts = line.split(':')
+            if len(parts) >= 2:  # Check that parts has at least 2 elements
+                try:
+                    chunk_num = int(parts[0].split()[1])
+                    count = int(parts[1].strip().split()[0])
+                    availability[chunk_num] = count
+                except (ValueError, IndexError):
+                    print(f"Invalid format in line: {line}")
+            else:
+                print(f"Invalid format in line: {line}")
+
+    # Ensure there are available chunks before proceeding
+    if not availability:
+        print("No chunks available for download.")
+        return
+
+    # Select the rarest chunk
+    rarest_chunk = min(availability, key=availability.get)
+    rarest_chunk_count = availability[rarest_chunk]
+    print(f"The rarest chunk is {rarest_chunk} with {rarest_chunk_count} peers holding it.")
+
+    # Now initiate the download process for the rarest chunk
+    download_chunk(server_socket, file_name, rarest_chunk)
+
+def download_chunk(server_socket, file_name, chunk_num):
+    # Here you would send a request to the server or relevant peer to download the specified chunk
+    print(f"Downloading chunk {chunk_num} of file {file_name}.")
+    # Implement the download logic as needed
+'''
 
 if __name__ == '__main__':
     Selfport = int(input("User port (0 - 65535): " ))
