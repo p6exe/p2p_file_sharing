@@ -37,7 +37,7 @@ class File:
         self.file_size = file_size
         self.chunks = {} #{chunk_num, [client_port]}
 
-        self.chunk_hashes = {}
+        self.chunk_hashes = {} #{chunk_num, chunk hash}
         self.num_of_chunks = 0
         if (file_size % DEFAULT_CHUNK_SIZE == 0):
             self.num_of_chunks = file_size // DEFAULT_CHUNK_SIZE
@@ -48,7 +48,7 @@ class File:
             self.chunks[i] = []
         self.file_debug()
 
-    def compute_chunk_hashes(self):
+    def compute_chunk_hashes(self, chunk_num):
         # Open the file and compute the hash for each chunk
         with open(self.file_name, 'rb') as file:
             for chunk_num in range(self.num_of_chunks):
@@ -57,6 +57,10 @@ class File:
                 self.chunk_hashes[chunk_num] = chunk_hash
                 print(f"Chunk {chunk_num} hash: {chunk_hash}")
 
+    def store_hashes(self, chunk_hashes):
+        for i in range(len(chunk_hashes)):
+            self.chunk_hashes[i] = chunk_hashes[i]
+        print(self.chunk_hashes)
     
     def register_new_client(self, client_port):
         for i in range(self.num_of_chunks):
@@ -73,7 +77,7 @@ class File:
         for chunk in self.chunks:
             file_locations.append(self.chunks[chunk][0])
         return file_locations
-    
+
     def get_num_of_chunks(self):
         return self.num_of_chunks
 
@@ -184,6 +188,14 @@ def recv(client_socket):
         elif(message == "file location"):
             file_name = client_socket.recv(1024).decode('utf-8')
             send_file_location(client_socket, file_name)
+        elif(message == "store hash"):
+            file_name = client_socket.recv(1024).decode('utf-8')
+            chunk_hashes = client_socket.recv(1024).decode('utf-8').split(',')
+            files[file_name].store_hashes(chunk_hashes)
+        elif(message == "verify chunk"):
+            file_name = client_socket.recv(1024).decode('utf-8')
+            chunk_num = client_socket.recv(8).decode('utf-8')
+            hash = files[file_name].compute_chunk_hashes(chunk_num)
         elif(message == "download"):
             file_name = client_socket.recv(1024).decode('utf-8')
             send_download_info(client_socket, file_name)

@@ -161,7 +161,7 @@ def download_from_peers(server_socket, peer_ports, file_name):
 
             peer_sockets_list.remove(peer_socket)
             peer_socket.close()
-            
+
             '''if data:
                 print(f"Received data: {data.decode()}")
                 peer_sockets_list.remove(peer_socket)
@@ -172,7 +172,15 @@ def download_from_peers(server_socket, peer_ports, file_name):
                 peer_sockets_list.remove(peer_socket)
                 peer_socket.close()'''
     register(server_socket, file_name)
-    #writes a new file
+    
+    file_integrity = True
+    #checks the integrity of file
+    for i in range(len(chunks)):
+        right_integrity = download_and_verify_chunk(server_socket, file_name, i)
+        if(right_integrity == False):
+            chunks[i] = None
+
+    #combiners the data
     with open("newfile.txt", 'wb') as file:
         for chunk in chunks:
             file.write(chunk)
@@ -266,7 +274,7 @@ def register(server_socket, file_name):
         files[file_name] = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
         #print("files: ", files)
 
-
+        send_hash(server_socket, file_name)
         #start_connection(Selfport) #once registered, user now can be connect from other clients
 
         print(f"File {file_name} registered with the server!")
@@ -329,9 +337,12 @@ def verify_chunk(chunk_data, expected_hash):
     return received_hash == expected_hash
 
 # Downloads a chunk and uses the helper to verify
-def download_and_verify_chunk(peer_socket, file_name, chunk_num):
-    chunk = peer_socket.recv(DEFAULT_CHUNK_SIZE)  # Receive chunk data
-    chunk_hash = peer_socket.recv(64).decode('utf-8')  # Receive chunk hash (SHA-256 hex is 64 chars)
+def download_and_verify_chunk(server_socket, file_name, chunk, chunk_num):
+    #chunk = server_socket.recv(DEFAULT_CHUNK_SIZE)  # Receive chunk data
+    server_socket.sendall("verify chunk".encode('utf-8'))
+    server_socket.sendall(file_name.encode('utf-8'))
+    server_socket.sendall(chunk_num.to_bytes(8, byteorder='big'))
+    chunk_hash = server_socket.recv(64).decode('utf-8')  # Receive chunk hash (SHA-256 hex is 64 chars)
 
     # Verify the chunk data
     if verify_chunk(chunk, chunk_hash):
@@ -341,6 +352,23 @@ def download_and_verify_chunk(peer_socket, file_name, chunk_num):
             f.write(chunk)
     else:
         print(f"Chunk {chunk_num} wrong chunk")
+
+
+def send_hash(server_socket, file_name):
+    server_socket.sendall("store hash".encode('utf-8'))
+
+    chunks = split_file_into_chunks(file_name, DEFAULT_CHUNK_SIZE)
+    chunk_hashes = []
+    for chunk_num in range(len(chunks)):
+        chunk_hash = hashlib.sha256(chunks[chunk_num]).hexdigest()  # Compute the hash
+        chunk_hashes.append(chunk_hash)
+        print(f"Chunk {chunk_num} hash: {chunk_hash}")
+    data_list = ','.join(chunk_hashes)
+    server_socket.sendall(file_name.encode('utf-8'))
+    server_socket.sendall(data_list.encode('utf-8'))
+
+    print("sent hash to server")
+
 
 def split_file_into_chunks(file_path, chunk_size):
     chunks = []
